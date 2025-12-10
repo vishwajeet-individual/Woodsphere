@@ -3,13 +3,12 @@
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
-import { loginAction } from '@/lib/actions/auth'; // Ensure this action exists (Code below if missing)
+import { loginAction } from '@/lib/actions/auth';
 import { useTransition } from 'react';
 import { toast } from 'sonner';
 import { Box, Button, Paper, TextField, Typography, Link as MuiLink } from '@mui/material';
 import Link from 'next/link';
 
-// Validation Schema
 const LoginSchema = z.object({
   email: z.string().email("Invalid email address"),
   password: z.string().min(1, "Password is required"),
@@ -24,15 +23,13 @@ export default function LoginPage() {
   });
 
   const onSubmit = (values: z.infer<typeof LoginSchema>) => {
-    startTransition(() => {
-      loginAction(values).then((data) => {
-        if (data?.error) {
-          toast.error(data.error);
-        } else {
-          toast.success("Welcome back!");
-          // NextAuth handles the redirect via the server action
-        }
-      });
+    startTransition(async () => {
+      const res = await loginAction(values);
+      if (res?.error) {
+        toast.error(res.error);
+      } else {
+        toast.success("Welcome back!");
+      }
     });
   };
 
@@ -42,10 +39,10 @@ export default function LoginPage() {
       sx={{ p: 4, borderRadius: 4, textAlign: 'center', boxShadow: '0 4px 20px rgba(0,0,0,0.05)' }}
     >
       <Typography variant="h5" fontWeight={700} gutterBottom>
-        Sign In
+        Welcome Back
       </Typography>
       <Typography variant="body2" color="text.secondary" sx={{ mb: 3 }}>
-        Access your orders and wishlist.
+        Login to manage your orders or store.
       </Typography>
 
       <Box component="form" onSubmit={form.handleSubmit(onSubmit)} noValidate>
@@ -74,16 +71,16 @@ export default function LoginPage() {
           fullWidth
           variant="contained"
           size="large"
-          sx={{ mt: 3, mb: 2, borderRadius: 50, py: 1.5 }}
+          sx={{ mt: 3, mb: 2, borderRadius: 8, py: 1.5 }}
           disabled={isPending}
         >
-          {isPending ? "Signing in..." : "Sign In"}
+          {isPending ? "Authenticating..." : "Sign In"}
         </Button>
         
         <Typography variant="body2" color="text.secondary">
-          Don't have an account?{' '}
+          New to Woodsphere?{' '}
           <MuiLink component={Link} href="/register" underline="hover" fontWeight={600}>
-            Sign up
+            Create an account
           </MuiLink>
         </Typography>
       </Box>

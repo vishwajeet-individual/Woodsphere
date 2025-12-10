@@ -8,7 +8,7 @@ async function getOrders() {
   return await prisma.order.findMany({
     include: { 
       user: { select: { name: true, email: true } },
-      _count: { select: { items: true } }
+      _count: { select: { subOrders: true } }
     },
     orderBy: { createdAt: 'desc' }
   });
@@ -32,7 +32,7 @@ export default async function AdminOrdersPage() {
                 <TableCell sx={{ fontWeight: 600, color: '#666' }}>CUSTOMER</TableCell>
                 <TableCell sx={{ fontWeight: 600, color: '#666' }}>DATE</TableCell>
                 <TableCell sx={{ fontWeight: 600, color: '#666' }}>TOTAL</TableCell>
-                <TableCell sx={{ fontWeight: 600, color: '#666' }}>ITEMS</TableCell>
+                <TableCell sx={{ fontWeight: 600, color: '#666' }}>SHIPMENTS</TableCell>
                 <TableCell sx={{ fontWeight: 600, color: '#666' }}>STATUS</TableCell>
               </TableRow>
             </TableHead>
@@ -50,16 +50,19 @@ export default async function AdminOrdersPage() {
                     {new Date(order.createdAt).toLocaleDateString('en-IN', { month: 'short', day: 'numeric' })}
                   </TableCell>
                   
-                  {/* ⚠️ FIX: Use sx prop for fontWeight */}
+                  {/* ⚠️ FIX: fontWeight moved to sx */}
                   <TableCell sx={{ fontWeight: 600 }}>
                     ₹{Number(order.total).toLocaleString('en-IN')}
                   </TableCell>
                   
                   <TableCell>
-                    {order._count.items}
+                    {order._count.subOrders}
                   </TableCell>
                   <TableCell>
-                    <OrderStatusSelect orderId={order.id} currentStatus={order.status} />
+                     {/* For Master Orders, just show text since vendors manage sub-orders */}
+                     <Typography variant="caption" sx={{ fontWeight: 600, color: 'text.secondary' }}>
+                       MANAGED BY VENDORS
+                     </Typography>
                   </TableCell>
                 </TableRow>
               ))}

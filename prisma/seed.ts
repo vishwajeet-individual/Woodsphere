@@ -3,6 +3,7 @@ import { PrismaClient } from '../generated/prisma';
 import { Pool } from 'pg';
 import { PrismaPg } from '@prisma/adapter-pg';
 import dotenv from 'dotenv';
+import bcrypt from 'bcryptjs';
 
 dotenv.config();
 
@@ -11,142 +12,206 @@ const pool = new Pool({ connectionString });
 const adapter = new PrismaPg(pool);
 const prisma = new PrismaClient({ adapter });
 
-// --- PRODUCT DATA ---
-const products = [
-  // Living Room
+// --- HELPERS ---
+const getUnsplash = (term: string) => `https://images.unsplash.com/photo-${term}?auto=format&fit=crop&w=800&q=80`;
+const SIZE_CHART_URL = "https://images.unsplash.com/photo-1586023492125-27b2c045efd7?auto=format&fit=crop&w=800&q=80&text=Size+Chart";
+
+// --- DATA ---
+const PRODUCTS = [
+  // --- LIVING ROOM ---
   {
-    name: "Cloud Sectional Sofa",
-    description: "Modular sectional sofa with deep seats and ultra-soft fabric.",
-    price: 89999.00,
-    stock: 5,
-    images: ["https://images.unsplash.com/photo-1555041469-a586c61ea9bc?auto=format&fit=crop&q=80"],
+    name: "Cloud Modular Sectional Sofa",
+    description: "Experience floating-on-air comfort with our deep-seated modular sectional. Upholstered in premium performance fabric that is stain-resistant and durable.",
+    price: 89999,
+    stock: 10,
     subSlug: "sofas-seating",
-    isFeatured: true
+    isFeatured: true,
+    story: "Designed by artisans in Jaipur, this sofa was inspired by the monsoon clouds. The fabric is hand-stitched to ensure every seam tells a story of precision.",
+    materialOrigin: "Cotton from Gujarat, Frame from Assam Teak",
+    images: [
+      "https://images.unsplash.com/photo-1555041469-a586c61ea9bc?w=800&q=80",
+      "https://images.unsplash.com/photo-1550226891-ef816aed4a98?w=800&q=80",
+      "https://images.unsplash.com/photo-1493663284031-b7e3aefcae8e?w=800&q=80",
+      SIZE_CHART_URL
+    ]
   },
   {
-    name: "Mid-Century Walnut Coffee Table",
-    description: "Solid walnut wood coffee table with glass top and brass legs.",
-    price: 15499.00,
-    stock: 12,
-    images: ["https://images.unsplash.com/photo-1533090481720-856c6e3c1fdc?auto=format&fit=crop&q=80"],
+    name: "Mid-Century Velvet Armchair",
+    description: "A statement piece for any room. Solid wood legs with gold caps, paired with lush emerald green velvet upholstery.",
+    price: 24500,
+    stock: 15,
+    subSlug: "sofas-seating",
+    isFeatured: false,
+    story: "This chair pays homage to the 1950s Bombay Art Deco movement.",
+    materialOrigin: "Mysore Silk Velvet",
+    images: [
+      "https://images.unsplash.com/photo-1567538096630-e994826720d2?w=800&q=80",
+      "https://images.unsplash.com/photo-1586023492125-27b2c045efd7?w=800&q=80",
+      SIZE_CHART_URL
+    ]
+  },
+  {
+    name: "Oak Minimalist Coffee Table",
+    description: "Handcrafted from solid oak with a matte finish. Features a lower shelf for magazines and remotes.",
+    price: 12999,
+    stock: 20,
     subSlug: "coffee-side-tables",
-    isFeatured: false
+    isFeatured: false,
+    story: "Carved from a single fallen oak tree to ensure grain consistency.",
+    materialOrigin: "Sustainable Oak Forest, Himachal",
+    images: [
+      "https://images.unsplash.com/photo-1533090481720-856c6e3c1fdc?w=800&q=80",
+      "https://images.unsplash.com/photo-1532323544230-7191fd51bc1b?w=800&q=80",
+      SIZE_CHART_URL
+    ]
   },
   {
-    name: "Minimalist Oak TV Unit",
-    description: "Low profile TV console with ample storage and cable management.",
-    price: 22999.00,
+    name: "Industrial TV Media Unit",
+    description: "Black metal frame with reclaimed wood surfaces. Fits TVs up to 65 inches with ample cable management.",
+    price: 18500,
     stock: 8,
-    images: ["https://images.unsplash.com/photo-1595428774223-ef52624120d2?auto=format&fit=crop&q=80"],
     subSlug: "tv-units",
-    isFeatured: false
+    isFeatured: false,
+    images: [
+      "https://images.unsplash.com/photo-1595428774223-ef52624120d2?w=800&q=80",
+      "https://images.unsplash.com/photo-1601628828688-632f38a5a7d0?w=800&q=80",
+      SIZE_CHART_URL
+    ]
   },
-  
-  // Bedroom
+  // --- BEDROOM ---
   {
-    name: "Luxe Tufted King Bed",
-    description: "Velvet tufted headboard with hydraulic storage base.",
-    price: 45000.00,
-    stock: 4,
-    images: ["https://images.unsplash.com/photo-1505693416388-b0346ef4174d?auto=format&fit=crop&q=80"],
+    name: "Royal Tufted King Bed",
+    description: "Sleep like royalty. High winged headboard with deep button tufting in a neutral beige linen fabric.",
+    price: 45000,
+    stock: 5,
     subSlug: "beds",
-    isFeatured: true
+    isFeatured: true,
+    story: "Hand-tufted by third-generation craftsmen.",
+    materialOrigin: "Linen from Belgium",
+    images: [
+      "https://images.unsplash.com/photo-1505693416388-b0346ef4174d?w=800&q=80",
+      "https://images.unsplash.com/photo-1522771753035-4a50423a5a63?w=800&q=80",
+      SIZE_CHART_URL
+    ]
   },
   {
     name: "Orthopedic Memory Foam Mattress",
-    description: "10-inch memory foam mattress with cooling gel technology.",
-    price: 18999.00,
-    stock: 20,
-    images: ["https://images.unsplash.com/photo-1631049307264-da0ec9d70304?auto=format&fit=crop&q=80"],
-    subSlug: "mattresses",
-    isFeatured: false
-  },
-  
-  // Dining
-  {
-    name: "Scandi 6-Seater Dining Set",
-    description: "Minimalist dining table with 6 ergonomic chairs.",
-    price: 35999.00,
-    stock: 3,
-    images: ["https://images.unsplash.com/photo-1617806118233-18e1de247200?auto=format&fit=crop&q=80"],
-    subSlug: "dining-sets",
-    isFeatured: true
-  },
-  
-  // Office
-  {
-    name: "ErgoPro Office Chair",
-    description: "High-back mesh chair with lumbar support and adjustable armrests.",
-    price: 12500.00,
+    description: "10-inch triple layer memory foam with cooling gel technology. Medium-firm support.",
+    price: 15999,
     stock: 50,
-    images: ["https://images.unsplash.com/photo-1505843490538-5133c6c7d0e1?auto=format&fit=crop&q=80"],
-    subSlug: "office-chairs",
-    isFeatured: true
-  },
-  {
-    name: "Standing Desk Converter",
-    description: "Adjustable height desk converter for healthier work habits.",
-    price: 8999.00,
-    stock: 15,
-    images: ["https://images.unsplash.com/photo-1595515106967-1b0895318725?auto=format&fit=crop&q=80"],
-    subSlug: "office-desks",
-    isFeatured: false
-  },
-  
-  // Decor
-  {
-    name: "Industrial Floor Lamp",
-    description: "Matte black metal floor lamp with adjustable head.",
-    price: 4500.00,
-    stock: 30,
-    images: ["https://images.unsplash.com/photo-1513506003013-d3c5240f55a1?auto=format&fit=crop&q=80"],
-    subSlug: "lighting",
-    isFeatured: false
-  },
-  {
-    name: "Abstract Geometric Rug",
-    description: "Hand-woven wool rug with modern geometric patterns.",
-    price: 6999.00,
-    stock: 10,
-    images: ["https://images.unsplash.com/photo-1575414723225-b873f2fd74be?auto=format&fit=crop&q=80"],
-    subSlug: "rugs-carpets",
-    isFeatured: false
+    subSlug: "mattresses",
+    isFeatured: true,
+    images: [
+      "https://images.unsplash.com/photo-1631049307264-da0ec9d70304?w=800&q=80",
+      "https://images.unsplash.com/photo-1631049552057-403cdb8f0658?w=800&q=80",
+      SIZE_CHART_URL
+    ]
   }
 ];
 
+// --- MAIN SEED FUNCTION ---
 async function main() {
-  console.log('🌱 Starting Product Seed...');
+  console.log('🌱 Starting V3 Refined Seed...');
 
-  // 1. Clear existing products (optional, for clean slate)
-  await prisma.product.deleteMany();
+  // 1. Ensure Categories Exist & Update Images
+  const taxonomy = [
+    { name: 'Living Room', slug: 'living-room', img: '1555041469-a586c61ea9bc', subs: ['Sofas & Seating', 'Coffee & Side Tables', 'TV Units', 'Storage'] },
+    { name: 'Bedroom', slug: 'bedroom', img: '1505693416388-b0346ef4174d', subs: ['Beds', 'Mattresses', 'Wardrobes', 'Bedside Tables'] },
+    { name: 'Dining & Kitchen', slug: 'dining-kitchen', img: '1617806118233-18e1de247200', subs: ['Dining Sets', 'Chairs & Benches', 'Bar Furniture'] },
+    { name: 'Office', slug: 'office', img: '1524758631624-e2822e304c36', subs: ['Office Chairs', 'Office Desks', 'Study Tables'] },
+    { name: 'Kids & Outdoor', slug: 'kids-outdoor', img: '1596178065887-1198b6148b2c', subs: ['Kids Beds & Storage', 'Study for Kids'] },
+    { name: 'Décor', slug: 'decor', img: '1513519245088-0e12902e5a38', subs: ['Lighting', 'Rugs & Carpets', 'Wall Decor & Mirrors'] },
+  ];
 
-  // 2. Loop and Insert
-  for (const product of products) {
-    // Find the subcategory ID based on the slug
-    const subCategory = await prisma.subCategory.findFirst({
-      where: { slug: product.subSlug }
+  for (const cat of taxonomy) {
+    const category = await prisma.category.upsert({
+      where: { slug: cat.slug },
+      update: { image: getUnsplash(cat.img) },
+      create: { name: cat.name, slug: cat.slug, image: getUnsplash(cat.img) }
     });
 
+    for (const sub of cat.subs) {
+      const subSlug = sub.toLowerCase().replace(/ & /g, '-').replace(/ /g, '-');
+      const existingSub = await prisma.subCategory.findFirst({ where: { slug: subSlug } });
+      if (!existingSub) {
+        await prisma.subCategory.create({
+          data: { name: sub, slug: subSlug, categoryId: category.id }
+        });
+      }
+    }
+  }
+
+  // 2. Get or Create Seller
+  let storeId: string | undefined;
+  
+  // Try to find ANY seller first
+  const existingSeller = await prisma.user.findFirst({ where: { role: 'SELLER' }, include: { store: true } });
+  
+  if (existingSeller && existingSeller.store) {
+    storeId = existingSeller.store.id;
+  } else {
+    console.log('Creating Default Seller...');
+    const hashedPassword = await bcrypt.hash('password123', 10);
+    const user = await prisma.user.create({
+       data: { name: "Seed Seller", email: "seed@seller.com", password: hashedPassword, role: 'SELLER' }
+    });
+    const store = await prisma.store.create({
+       data: { name: "Woodsphere Direct", slug: "woodsphere-direct", userId: user.id, status: 'ACTIVE' }
+    });
+    storeId = store.id;
+  }
+
+  // 3. Insert Products
+  console.log("Creating Products...");
+  
+  // Optional: Clear old products to avoid duplicates during dev
+  await prisma.cartItem.deleteMany();
+  await prisma.orderItem.deleteMany();
+  await prisma.review.deleteMany();
+  await prisma.product.deleteMany();
+
+  for (const p of PRODUCTS) {
+    const subCategory = await prisma.subCategory.findFirst({ where: { slug: p.subSlug } });
+    
     if (!subCategory) {
-      console.warn(`⚠️ SubCategory not found for slug: ${product.subSlug}. Skipping product: ${product.name}`);
+      console.warn(`Skipping ${p.name}: SubCategory ${p.subSlug} not found`);
       continue;
     }
 
     await prisma.product.create({
       data: {
-        name: product.name,
-        description: product.description,
-        price: product.price,
-        stock: product.stock,
-        images: product.images,
+        name: p.name,
+        description: p.description,
+        price: p.price,
+        stock: p.stock,
+        images: p.images,
+        isFeatured: p.isFeatured,
+        storeId: storeId!,
         subCategoryId: subCategory.id,
-        isFeatured: product.isFeatured
+        // New Fields
+        story: p.story || "Crafted with passion.",
+        materialOrigin: p.materialOrigin || "Ethically Sourced",
       }
     });
-    console.log(`✅ Created: ${product.name}`);
   }
 
-  console.log('🎉 Product Seeding Completed.');
+  // 4. Setup Site Settings (Hero Banner)
+  await prisma.siteSettings.upsert({
+    where: { id: 'config' },
+    update: {},
+    create: {
+      id: 'config',
+      heroConfig: {
+        heading: "Crafting the future of your home.",
+        subHeading: "Discover a world where sustainable materials meet timeless design.",
+        imageUrl: "https://images.unsplash.com/photo-1616486338812-3dadae4b4f9d?q=80&w=2070&auto=format&fit=crop",
+        ctaText: "Shop Collection",
+        ctaLink: "/search"
+      }
+    }
+  });
+
+  console.log('✅ V3 Data Injected Successfully.');
 }
 
 main()

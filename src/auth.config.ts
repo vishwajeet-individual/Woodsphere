@@ -3,37 +3,41 @@ import type { NextAuthConfig } from 'next-auth';
 
 export const authConfig = {
   pages: {
-    signIn: '/login', // Redirect here if user needs to login
+    signIn: '/login',
   },
   callbacks: {
+    // 1. Protection Middleware Logic
     authorized({ auth, request: { nextUrl } }) {
       const isLoggedIn = !!auth?.user;
-      const isOnAdminPanel = nextUrl.pathname.startsWith('/admin');
-      const isOnAuthPage = nextUrl.pathname.startsWith('/login') || nextUrl.pathname.startsWith('/register');
+      const role = (auth?.user as any)?.role;
 
-      // 1. Protect Admin Routes
-      if (isOnAdminPanel) {
-        // @ts-ignore
-        if (isLoggedIn && auth.user.role === 'ADMIN') return true;
+      const isHQ = nextUrl.pathname.startsWith('/hq');     // Super Admin
+      const isVendor = nextUrl.pathname.startsWith('/vendor'); // Seller
+
+      // Protect HQ (Super Admin Only)
+      if (isHQ) {
+        if (isLoggedIn && role === 'SUPER_ADMIN') return true;
         return false; // Redirect to login
       }
 
-      // 2. Redirect logged-in users away from Login/Register pages
-      if (isOnAuthPage && isLoggedIn) {
-        return Response.redirect(new URL('/', nextUrl));
+      // Protect Vendor Dashboard (Sellers Only)
+      if (isVendor) {
+        if (isLoggedIn && role === 'SELLER') return true;
+        return false;
       }
 
       return true;
     },
-    // Add User ID and Role to the Session (so we can use it in the Header)
+    // 2. Token Augmentation
     jwt({ token, user }) {
       if (user) {
-        // @ts-ignore
-        token.role = user.role;
         token.id = user.id;
+        // @ts-ignore
+        token.role = user.role; 
       }
       return token;
     },
+    // 3. Session Augmentation
     session({ session, token }) {
       if (session.user) {
         // @ts-ignore
@@ -44,5 +48,5 @@ export const authConfig = {
       return session;
     }
   },
-  providers: [], // Providers are configured in auth.ts
+  providers: [], 
 } satisfies NextAuthConfig;

@@ -1,53 +1,78 @@
 import { prisma } from '@/lib/prisma';
 import Hero from '@/components/home/Hero';
 import CategoryGrid from '@/components/home/CategoryGrid';
-import ProductCard from '@/components/ui/ProductCard';
-import LinkButton from '@/components/ui/LinkButton';
-import { Box, Container, Typography } from '@mui/material';
-import Grid from '@mui/material/Grid2'; // ⚠️ Using Grid2
-import { ArrowForward } from '@mui/icons-material';
+import ProductGridSection from '@/components/product/ProductGridSection';
+import SellerCTA from '@/components/home/SellerCTA';
+import SaleBanner from '@/components/home/SaleBanner';
+import Testimonials from '@/components/home/Testimonials';
+import { Box, Container, Stack } from '@mui/material';
 
 export const dynamic = 'force-dynamic';
 
-async function getCategories() {
-  return await prisma.category.findMany({ take: 6, orderBy: { name: 'asc' } });
-}
+// --- DATA FETCHING ---
+async function getHomepageData() {
+  const [categories, bestSellers, saleItems, reviews, settings] = await Promise.all([
+    // 1. Categories (Now with images)
+    prisma.category.findMany({ take: 6, orderBy: { name: 'asc' } }),
+    
+    // 2. Best Sellers
+    prisma.product.findMany({ where: { isFeatured: true }, take: 4, include: { subCategory: true } }),
+    
+    // 3. Sale Items
+    prisma.product.findMany({ 
+      where: { OR: [{ isSale: true }, { price: { lte: 25000 } }] },
+      take: 4, include: { subCategory: true }, orderBy: { price: 'asc' }
+    }),
 
-async function getFeaturedProducts() {
-  return await prisma.product.findMany({
-    where: { isFeatured: true },
-    take: 4,
-    include: { subCategory: true },
-  });
+    // 4. Top Reviews (5 Stars, recent)
+    prisma.review.findMany({
+      where: { rating: 5, comment: { not: "" } }, // Only with comments
+      take: 3,
+      orderBy: { createdAt: 'desc' },
+      include: { user: { select: { name: true, image: true } } }
+    }),
+
+    // 5. Hero Config
+    prisma.siteSettings.findUnique({ where: { id: 'config' } })
+  ]);
+
+  return { categories, bestSellers, saleItems, reviews, heroConfig: settings?.heroConfig };
 }
 
 export default async function Home() {
-  const categories = await getCategories();
-  const featuredProducts = await getFeaturedProducts();
+  const data = await getHomepageData();
 
   return (
-    <Box>
-      <Hero />
-      <CategoryGrid categories={categories} />
-      <Box sx={{ py: 8, bgcolor: '#f5f5f7' }}>
-        <Container maxWidth="xl">
-          <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'end', mb: 4 }}>
-             <Box>
-                <Typography variant="h3" fontWeight={700} gutterBottom>Featured Collection.</Typography>
-                <Typography variant="body1" color="text.secondary">Hand-picked favorites.</Typography>
-             </Box>
-             <LinkButton href="/search" endIcon={<ArrowForward />}>View All</LinkButton>
-          </Box>
+    <Box sx={{ bgcolor: '#ffffff', minHeight: '100vh', pb: 0 }}>
+      
+      {/* 1. Dynamic Hero */}
+      <Hero data={data.heroConfig} />
 
-          <Grid container spacing={3}>
-            {featuredProducts.map((product) => (
-              <Grid size={{ xs: 12, sm: 6, md: 3 }} key={product.id}>
-                <ProductCard product={{ ...product, price: Number(product.price) }} />
-              </Grid>
-            ))}
-          </Grid>
+      <Stack spacing={6} sx={{ mt: 6, mb: 0 }}>
+        
+        {/* Sales */}
+        <Container maxWidth="xl">
+           <SaleBanner />
         </Container>
-      </Box>
+
+        <Container maxWidth="xl">
+           <ProductGridSection title="Flash Deals" products={data.saleItems} viewAllLink="/search?sale=true" />
+        </Container>
+
+        {/* Categories (Real Images) */}
+        <CategoryGrid categories={data.categories} />
+
+        {/* Best Sellers */}
+        <Container maxWidth="xl">
+           <ProductGridSection title="Best Sellers" products={data.bestSellers} viewAllLink="/search?sort=popular" />
+        </Container>
+
+        {/* Real Testimonials */}
+        <Testimonials reviews={data.reviews} />
+
+        <SellerCTA />
+
+      </Stack>
     </Box>
   );
 }

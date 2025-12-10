@@ -2,22 +2,14 @@
 
 import { auth } from '@/auth';
 import { prisma } from '@/lib/prisma';
-import { revalidatePath } from 'next/cache';
-import { z } from 'zod';
-import { Prisma } from '../../../generated/prisma'; // Import types from your custom output
+import { Prisma } from '../../../generated/prisma';
+import crypto from 'crypto'; // Native Node.js crypto module
 
-// --- Schema ---
-const AddressSchema = z.object({
-  street: z.string().min(5),
-  city: z.string().min(2),
-  state: z.string().min(2),
-  zip: z.string().min(6),
-  country: z.string().default("India"),
-});
+const COMMISSION_RATE = 0.10;
 
-// --- Actions ---
-
+// ... (keep addAddressAction same as before) ...
 export async function addAddressAction(formData: FormData) {
+  // ... (keep existing code)
   const session = await auth();
   if (!session?.user?.id) return { error: "Not authenticated" };
 
@@ -28,93 +20,139 @@ export async function addAddressAction(formData: FormData) {
     zip: formData.get('zip') as string,
   };
 
-  const validated = AddressSchema.safeParse(data);
-  if (!validated.success) return { error: "Invalid address data" };
+  if (!data.street || !data.city) return { error: "Invalid address" };
 
   try {
     await prisma.address.create({
-      data: {
-        ...validated.data,
-        userId: session.user.id,
-      }
+      data: { ...data, userId: session.user.id }
     });
-    revalidatePath('/checkout');
     return { success: true };
   } catch (e) {
     return { error: "Failed to save address" };
   }
 }
 
-export async function placeOrderAction(addressId: string, cartItems: any[]) {
+// ⚠️ FIXED PLACE ORDER ACTION
+export async function placeOrderAction(
+  addressId: string, 
+  cartItems: any[], 
+  paymentDetails?: { razorpayOrderId: string, razorpayPaymentId: string, razorpaySignature: string },
+  buyerNote?: string,
+) {
   const session = await auth();
-  
-  // 1. Capture User ID securely outside transaction to satisfy TypeScript
   const userId = session?.user?.id;
   if (!userId) return { error: "Not authenticated" };
 
   if (!addressId) return { error: "Please select an address" };
   if (cartItems.length === 0) return { error: "Cart is empty" };
 
-  let total = 0;
-  
-  // 2. Define strict type for the items array
-  type OrderItemInput = {
-    productId: string;
-    quantity: number;
-    price: Prisma.Decimal;
-  };
-  
-  const orderItemsData: OrderItemInput[] = [];
-
-  // 3. Validate Stock & Calculate Price
-  for (const item of cartItems) {
-    const product = await prisma.product.findUnique({ where: { id: item.id } });
-    if (!product) continue;
+  // 🔒 1. PAYMENT VERIFICATION LOGIC
+  if (paymentDetails) {
+    const { razorpayOrderId, razorpayPaymentId, razorpaySignature } = paymentDetails;
     
-    if (product.stock < item.quantity) {
-      return { error: `Not enough stock for ${product.name}` };
+    // Ensure Secret exists
+    if (!process.env.RAZORPAY_KEY_SECRET) {
+      console.error("❌ RAZORPAY_KEY_SECRET is missing in .env");
+      return { error: "Server Configuration Error: Payment Secret Missing" };
     }
 
-    const itemTotal = Number(product.price) * item.quantity;
-    total += itemTotal;
+    const body = razorpayOrderId + "|" + razorpayPaymentId;
+    
+    const expectedSignature = crypto
+      .createHmac("sha256", process.env.RAZORPAY_KEY_SECRET)
+      .update(body.toString())
+      .digest("hex");
 
-    orderItemsData.push({
+    if (expectedSignature !== razorpaySignature) {
+      console.error("❌ Signature Mismatch!");
+      console.error("Expected:", expectedSignature);
+      console.error("Received:", razorpaySignature);
+      return { error: "Payment verification failed. Please contact support." };
+    }
+  }
+
+  // ... (Standard Split Logic) ...
+  const storeGroups: Record<string, any> = {};
+  let grandTotal = 0;
+
+  for (const cartItem of cartItems) {
+    const product = await prisma.product.findUnique({ 
+      where: { id: cartItem.id },
+      select: { id: true, price: true, stock: true, storeId: true, name: true } 
+    });
+
+    if (!product) continue;
+    if (product.stock < cartItem.quantity) return { error: `Out of stock: ${product.name}` };
+
+    const price = Number(product.price);
+    const lineTotal = price * cartItem.quantity;
+    const commission = lineTotal * COMMISSION_RATE;
+    const sellerEarnings = lineTotal - commission;
+
+    grandTotal += lineTotal;
+
+    if (!storeGroups[product.storeId]) {
+      storeGroups[product.storeId] = { storeId: product.storeId, total: 0, items: [] };
+    }
+
+    storeGroups[product.storeId].total += lineTotal;
+    storeGroups[product.storeId].items.push({
       productId: product.id,
-      quantity: item.quantity,
-      price: product.price 
+      quantity: cartItem.quantity,
+      price: price,
+      commission,
+      sellerEarnings
     });
   }
 
-  // 4. Transaction
   try {
-    const order = await prisma.$transaction(async (tx) => {
-      // A. Create Order
-      const newOrder = await tx.order.create({
+    const masterOrder = await prisma.$transaction(async (tx) => {
+      const order = await tx.order.create({
         data: {
-          userId: userId, // Use the captured variable
-          total: new Prisma.Decimal(total),
-          status: 'PENDING',
+          userId,
+          total: new Prisma.Decimal(grandTotal),
+          status: paymentDetails ? 'PROCESSING' : 'PENDING', // If paid, set to Processing
           shippingAddress: addressId,
-          items: {
-            create: orderItemsData // Types now match
-          }
+          // Only save payment ID if it exists
+          paymentId: paymentDetails?.razorpayPaymentId || null, 
+          buyerNote: buyerNote || null,
         }
       });
 
-      // B. Decrement Stock
-      for (const item of orderItemsData) {
-        await tx.product.update({
-          where: { id: item.productId },
-          data: { stock: { decrement: item.quantity } }
+      for (const storeId in storeGroups) {
+        const group = storeGroups[storeId];
+        await tx.subOrder.create({
+          data: {
+            orderId: order.id,
+            storeId: group.storeId,
+            status: 'PENDING',
+            total: new Prisma.Decimal(group.total),
+            items: {
+              create: group.items.map((item: any) => ({
+                productId: item.productId,
+                quantity: item.quantity,
+                price: new Prisma.Decimal(item.price),
+                commission: new Prisma.Decimal(item.commission),
+                sellerEarnings: new Prisma.Decimal(item.sellerEarnings)
+              }))
+            }
+          }
         });
-      }
 
-      return newOrder;
+        for (const item of group.items) {
+          await tx.product.update({
+            where: { id: item.productId },
+            data: { stock: { decrement: item.quantity } }
+          });
+        }
+      }
+      return order;
     });
 
-    return { orderId: order.id };
-  } catch (e) {
-    console.error(e);
-    return { error: "Transaction failed" };
+    return { orderId: masterOrder.id };
+
+  } catch (e: any) {
+    console.error("Database Transaction Error:", e);
+    return { error: "Database transaction failed." };
   }
 }

@@ -14,7 +14,15 @@ datasource db {
 // --- ENUMS ---
 enum Role {
   USER
-  ADMIN
+  SELLER
+  SUPER_ADMIN
+}
+
+enum StoreStatus {
+  PENDING
+  ACTIVE
+  SUSPENDED
+  REJECTED
 }
 
 enum OrderStatus {
@@ -25,7 +33,7 @@ enum OrderStatus {
   CANCELLED
 }
 
-// --- MODELS ---
+// --- CORE IDENTITY ---
 
 model User {
   id            String    @id @default(cuid())
@@ -34,25 +42,58 @@ model User {
   password      String?
   role          Role      @default(USER)
   image         String?
+  
+  // Vendor Link
+  store         Store?    
+  
+  // Buyer Data
+  addresses     Address[]
+  orders        Order[]   
+  reviews       Review[]
+  cart          Cart?
+  
   createdAt     DateTime  @default(now())
   updatedAt     DateTime  @updatedAt
-
-  orders        Order[]
-  addresses     Address[]
-  cart          Cart?
 }
+
+// --- VENDOR SYSTEM ---
+
+model Store {
+  id              String      @id @default(cuid())
+  name            String
+  slug            String      @unique 
+  description     String?
+  logoUrl         String?
+  status          StoreStatus @default(PENDING)
+  
+  // Platform Commission (Default 10%)
+  commissionRate  Decimal     @default(10.0) @db.Decimal(5, 2) 
+  
+  userId          String      @unique
+  user            User        @relation(fields: [userId], references: [id])
+
+  products        Product[]
+  subOrders       SubOrder[]  
+  payouts         Payout[]    
+
+  createdAt       DateTime    @default(now())
+  updatedAt       DateTime    @updatedAt
+}
+
+// --- CATALOG ---
 
 model Category {
   id            String        @id @default(cuid())
-  name          String        // e.g., "Living Room"
-  slug          String        @unique // e.g., "living-room"
+  name          String
+  slug          String        @unique
+  image         String?
   subCategories SubCategory[]
 }
 
 model SubCategory {
   id            String    @id @default(cuid())
-  name          String    // e.g., "Sofas & Seating"
-  slug          String    // e.g., "sofas-seating"
+  name          String
+  slug          String
   categoryId    String
   category      Category  @relation(fields: [categoryId], references: [id])
   products      Product[]
@@ -65,36 +106,98 @@ model Product {
   price         Decimal     @db.Decimal(10, 2)
   stock         Int         @default(0)
   images        String[]
+  
   subCategoryId String
   subCategory   SubCategory @relation(fields: [subCategoryId], references: [id])
+  
+  // ⚠️ Link to Seller
+  storeId       String
+  store         Store       @relation(fields: [storeId], references: [id])
+
   isFeatured    Boolean     @default(false)
   isSale        Boolean     @default(false)
   
-  cartItems     CartItem[]
   orderItems    OrderItem[]
+  cartItems     CartItem[]
+  reviews       Review[]
+  
   createdAt     DateTime    @default(now())
+  updatedAt     DateTime    @updatedAt
+
+  story         String?   @db.Text // The "Why" behind the product
+  makerVideo    String?   // Cloudinary URL for a 10s video
+  materialOrigin String?  // e.g. "Reclaimed Teak from Kerala"
 }
+
+// --- ORDER SYSTEM (Split Logic) ---
 
 model Order {
   id              String      @id @default(cuid())
   userId          String
   user            User        @relation(fields: [userId], references: [id])
-  status          OrderStatus @default(PENDING)
-  total           Decimal     @db.Decimal(10, 2)
-  shippingAddress String
-  items           OrderItem[]
+  
+  total           Decimal     @db.Decimal(10, 2) 
+  status          OrderStatus @default(PENDING) 
+  shippingAddress String      
+
+  paymentId       String?
+  
+  subOrders       SubOrder[] 
+  
   createdAt       DateTime    @default(now())
+  updatedAt       DateTime    @updatedAt
+
+  buyerNote     String?   // The emotional connection message
+}
+
+model SubOrder {
+  id              String      @id @default(cuid())
+  
+  orderId         String
+  order           Order       @relation(fields: [orderId], references: [id])
+  
+  storeId         String
+  store           Store       @relation(fields: [storeId], references: [id])
+  
+  status          OrderStatus @default(PENDING) 
+  total           Decimal     @db.Decimal(10, 2) 
+  
+  items           OrderItem[]
+  
+  createdAt       DateTime    @default(now())
+  updatedAt       DateTime    @updatedAt
 }
 
 model OrderItem {
-  id        String  @id @default(cuid())
-  orderId   String
-  order     Order   @relation(fields: [orderId], references: [id])
-  productId String
-  product   Product @relation(fields: [productId], references: [id])
-  quantity  Int
-  price     Decimal @db.Decimal(10, 2)
+  id            String    @id @default(cuid())
+  
+  subOrderId    String
+  subOrder      SubOrder  @relation(fields: [subOrderId], references: [id])
+  
+  productId     String
+  product       Product   @relation(fields: [productId], references: [id])
+  
+  quantity      Int
+  price         Decimal   @db.Decimal(10, 2) 
+  
+  // Financial Snapshot
+  commission    Decimal   @db.Decimal(10, 2) 
+  sellerEarnings Decimal  @db.Decimal(10, 2) 
 }
+
+// --- FINANCIALS ---
+
+model Payout {
+  id            String    @id @default(cuid())
+  storeId       String
+  store         Store     @relation(fields: [storeId], references: [id])
+  amount        Decimal   @db.Decimal(10, 2)
+  status        String    // REQUESTED, PAID, REJECTED
+  transactionId String?   
+  createdAt     DateTime  @default(now())
+}
+
+// --- UTILS ---
 
 model Address {
   id        String   @id @default(cuid())
@@ -105,6 +208,18 @@ model Address {
   state     String
   zip       String
   country   String   @default("India")
+}
+
+model Review {
+  id        String   @id @default(cuid())
+  rating    Int      @default(5) 
+  comment   String?
+  userId    String
+  user      User     @relation(fields: [userId], references: [id])
+  productId String
+  product   Product  @relation(fields: [productId], references: [id])
+  createdAt DateTime @default(now())
+  @@unique([userId, productId])
 }
 
 model Cart {
@@ -124,4 +239,16 @@ model CartItem {
   quantity  Int      @default(1)
 
   @@unique([cartId, productId])
+}
+
+// Global Configuration (Singleton pattern: ID will always be 'config')
+model SiteSettings {
+  id          String   @id @default("config")
+  // Footer Config
+  footerConfig Json?
+  
+  // NEW: Hero Config (Title, Image, Link)
+  heroConfig   Json?   
+  
+  updatedAt   DateTime @updatedAt
 }

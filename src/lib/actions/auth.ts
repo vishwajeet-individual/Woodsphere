@@ -1,4 +1,3 @@
-// src/lib/actions/auth.ts
 'use server';
 
 import { prisma } from '@/lib/prisma';
@@ -7,6 +6,7 @@ import { signIn } from '@/auth';
 import { AuthError } from 'next-auth';
 import { z } from 'zod';
 
+// ... (RegisterSchema remains the same)
 const RegisterSchema = z.object({
   name: z.string().min(2),
   email: z.string().email(),
@@ -24,6 +24,8 @@ export async function registerAction(values: any) {
 
   const hashedPassword = await bcrypt.hash(password, 10);
 
+  // Default role is USER. 
+  // If they want to be a seller, we handle that flow on the client side after registration (redirect to /sell)
   await prisma.user.create({
     data: { name, email, password: hashedPassword, role: 'USER' }
   });
@@ -32,11 +34,25 @@ export async function registerAction(values: any) {
 }
 
 export async function loginAction(values: any) {
+  const { email, password } = values;
+
+  // 1. Check User Role manually to determine redirect destination
+  const user = await prisma.user.findUnique({ where: { email } });
+  
+  // We let signIn handle the password validation, but we prepare the destination
+  let destination = '/';
+  
+  if (user) {
+    if (user.role === 'SELLER') destination = '/admin';
+    else if (user.role === 'SUPER_ADMIN') destination = '/hq';
+    else destination = '/'; // USER
+  }
+
   try {
     await signIn("credentials", {
-      email: values.email,
-      password: values.password,
-      redirectTo: '/',
+      email,
+      password,
+      redirectTo: destination, // ⚠️ Smart Redirect
     });
   } catch (error) {
     if (error instanceof AuthError) {

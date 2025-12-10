@@ -1,19 +1,36 @@
+import { auth } from '@/auth';
 import { prisma } from '@/lib/prisma';
 import { Box, Typography, Card, Stack } from '@mui/material';
-import Grid from '@mui/material/Grid'; // Classic Grid
-import { AttachMoney, ShoppingBag, Person, TrendingUp } from '@mui/icons-material';
+import Grid from '@mui/material/Grid2'; // Grid v6
+import { AttachMoney, ShoppingBag, Inventory, Star } from '@mui/icons-material';
+import { redirect } from 'next/navigation';
 
-// Fetch Real Data
-async function getStats() {
-  const totalOrders = await prisma.order.count();
-  const totalCustomers = await prisma.user.count({ where: { role: 'USER' } });
-  const totalProducts = await prisma.product.count();
+export const dynamic = 'force-dynamic';
+
+async function getVendorStats(userId: string) {
+  // 1. Get the Vendor's Store ID
+  const store = await prisma.store.findUnique({
+    where: { userId },
+    select: { id: true, name: true }
+  });
+
+  if (!store) return null;
+
+  // 2. Fetch Metrics scoped to this Store
+  const totalProducts = await prisma.product.count({
+    where: { storeId: store.id }
+  });
+
+  // Calculate Revenue from SubOrders (The V2 split logic)
+  const subOrders = await prisma.subOrder.findMany({
+    where: { storeId: store.id },
+    select: { total: true }
+  });
   
-  // Calculate Revenue (Sum of Decimal fields needs handling)
-  const orders = await prisma.order.findMany({ select: { total: true } });
-  const totalRevenue = orders.reduce((acc, order) => acc + Number(order.total), 0);
+  const totalRevenue = subOrders.reduce((acc, order) => acc + Number(order.total), 0);
+  const totalOrders = subOrders.length;
 
-  return { totalOrders, totalCustomers, totalProducts, totalRevenue };
+  return { storeName: store.name, totalProducts, totalRevenue, totalOrders };
 }
 
 // Reusable Stat Card
@@ -37,45 +54,60 @@ function StatCard({ title, value, icon, color }: any) {
   );
 }
 
-export default async function AdminDashboard() {
-  const stats = await getStats();
+export default async function VendorDashboard() {
+  const session = await auth();
+  if (!session?.user?.id) redirect('/login');
+
+  const stats = await getVendorStats(session.user.id);
+
+  if (!stats) {
+    return (
+      <Box p={4}>
+        <Typography variant="h5">No Store Found.</Typography>
+        <Typography color="text.secondary">You need to register as a seller first.</Typography>
+      </Box>
+    );
+  }
 
   return (
     <Box>
-      <Typography variant="h4" fontWeight={700} sx={{ mb: 4, letterSpacing: '-0.02em' }}>
-        Dashboard
+      <Typography variant="h4" fontWeight={700} sx={{ mb: 1, letterSpacing: '-0.02em' }}>
+        Overview
+      </Typography>
+      <Typography variant="body1" color="text.secondary" sx={{ mb: 4 }}>
+        Welcome back, <b>{stats.storeName}</b>. Here is what's happening today.
       </Typography>
 
       <Grid container spacing={3}>
-        <Grid item xs={12} sm={6} md={3}>
+        <Grid size={{ xs: 12, sm: 6, md: 3 }}>
            <StatCard 
-             title="Total Revenue" 
+             title="My Revenue" 
              value={`₹${stats.totalRevenue.toLocaleString('en-IN')}`} 
              icon={<AttachMoney />} 
              color="#34c759" // Green
            />
         </Grid>
-        <Grid item xs={12} sm={6} md={3}>
+        <Grid size={{ xs: 12, sm: 6, md: 3 }}>
            <StatCard 
-             title="Total Orders" 
+             title="Orders" 
              value={stats.totalOrders} 
              icon={<ShoppingBag />} 
              color="#0071e3" // Blue
            />
         </Grid>
-        <Grid item xs={12} sm={6} md={3}>
+        <Grid size={{ xs: 12, sm: 6, md: 3 }}>
            <StatCard 
-             title="Customers" 
-             value={stats.totalCustomers} 
-             icon={<Person />} 
+             title="Products" 
+             value={stats.totalProducts} 
+             icon={<Inventory />} 
              color="#ff9500" // Orange
            />
         </Grid>
-        <Grid item xs={12} sm={6} md={3}>
+        <Grid size={{ xs: 12, sm: 6, md: 3 }}>
            <StatCard 
-             title="Active Products" 
-             value={stats.totalProducts} 
-             icon={<TrendingUp />} 
+             title="Store Rating" 
+             value="4.9" // Placeholder until we build reviews
+             icon={<Star />} 
              color="#af52de" // Purple
            />
         </Grid>

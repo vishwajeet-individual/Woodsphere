@@ -1,13 +1,16 @@
 'use client';
 
 import { Box, Button, Stack, Typography, IconButton } from '@mui/material';
-import { Add, Remove, ShoppingBag } from '@mui/icons-material';
+import { Add, Remove, Home, FlashOn } from '@mui/icons-material';
 import { useState } from 'react';
-import { useCart } from '@/context/CartContext'; // <--- Import Hook
+import { useCart } from '@/context/CartContext';
+import { toast } from 'sonner';
+import { useRouter } from 'next/navigation';
 
 export default function AddToCart({ product }: { product: any }) {
   const [quantity, setQuantity] = useState(1);
-  const { addToCart } = useCart(); // <--- Use Hook
+  const { addToCart } = useCart();
+  const router = useRouter();
 
   const handleIncrement = () => {
     if (quantity < product.stock) setQuantity(q => q + 1);
@@ -17,48 +20,83 @@ export default function AddToCart({ product }: { product: any }) {
     if (quantity > 1) setQuantity(q => q - 1);
   };
 
-  const handleAddToCart = () => {
-    addToCart(product, quantity); // <--- Use Real Logic
+  const handleReserve = () => {
+    addToCart(product, quantity);
+    toast.success(`Reserved ${product.name} for your home`);
   };
 
-  // ... Rest of the JSX remains the same
+  const handleBuyNow = () => {
+    addToCart(product, quantity);
+    router.push('/checkout'); 
+  };
+
+  const isOutOfStock = product.stock <= 0;
+
   return (
-    // ... Copy existing JSX
     <Box sx={{ mt: 4 }}>
-      <Stack direction="row" alignItems="center" spacing={2} sx={{ mb: 3 }}>
-        <Typography variant="body2" color="text.secondary" fontWeight={600}>
-            Quantity:
-        </Typography>
-        <Stack direction="row" alignItems="center" sx={{ border: '1px solid #e5e5e5', borderRadius: 50, px: 1 }}>
-            <IconButton size="small" onClick={handleDecrement} disabled={quantity <= 1}>
+      
+      {/* Quantity & Stock Status */}
+      <Stack direction="row" alignItems="center" spacing={3} mb={3}>
+        <Stack direction="row" alignItems="center" sx={{ border: '1px solid #ddd', borderRadius: 2 }}>
+            <IconButton onClick={handleDecrement} disabled={quantity <= 1 || isOutOfStock} size="small">
                 <Remove fontSize="small" />
             </IconButton>
-            <Typography variant="body2" fontWeight={600} sx={{ mx: 2, minWidth: '20px', textAlign: 'center' }}>
+            <Typography variant="body1" fontWeight={600} sx={{ px: 2, minWidth: 40, textAlign: 'center' }}>
                 {quantity}
             </Typography>
-            <IconButton size="small" onClick={handleIncrement} disabled={quantity >= product.stock}>
+            <IconButton onClick={handleIncrement} disabled={quantity >= product.stock || isOutOfStock} size="small">
                 <Add fontSize="small" />
             </IconButton>
         </Stack>
+
+        <Typography variant="body2" color={isOutOfStock ? "error" : "success.main"} fontWeight={600}>
+           {isOutOfStock ? "Out of Stock" : (product.stock < 5 ? `Only ${product.stock} left!` : "In Stock")}
+        </Typography>
       </Stack>
 
-      <Button 
-          variant="contained" 
-          fullWidth 
-          size="large"
-          startIcon={<ShoppingBag />}
-          onClick={handleAddToCart}
-          disabled={product.stock <= 0}
-          sx={{ py: 1.8, fontSize: '1rem', borderRadius: 50 }}
-      >
-          {product.stock > 0 ? 'Add to Bag' : 'Out of Stock'}
-      </Button>
+      {/* Action Buttons (Full Width Stack) */}
+      <Stack direction={{ xs: 'column', sm: 'row' }} spacing={2}>
+          <Button 
+              variant="contained" 
+              fullWidth 
+              size="large"
+              startIcon={<Home />} 
+              onClick={handleReserve}
+              disabled={isOutOfStock}
+              sx={{ 
+                py: 1.8, 
+                fontSize: '1rem', 
+                borderRadius: 50, 
+                textTransform: 'none',
+                fontWeight: 700,
+                bgcolor: '#1d1d1f',
+                '&:hover': { bgcolor: '#000' }
+              }} 
+          >
+              {isOutOfStock ? 'Notify Me' : 'Reserve'}
+          </Button>
+
+          <Button 
+              variant="contained" 
+              fullWidth 
+              size="large"
+              startIcon={<FlashOn />} 
+              onClick={handleBuyNow}
+              disabled={isOutOfStock}
+              sx={{ 
+                py: 1.8, 
+                fontSize: '1rem', 
+                borderRadius: 50, 
+                textTransform: 'none',
+                fontWeight: 700,
+                bgcolor: 'primary.main',
+                '&:hover': { bgcolor: 'primary.dark' }
+              }} 
+          >
+              Buy Now
+          </Button>
+      </Stack>
       
-      {product.stock < 5 && product.stock > 0 && (
-         <Typography variant="caption" color="error" sx={{ mt: 1, display: 'block', fontWeight: 600 }}>
-            Only {product.stock} items left!
-         </Typography>
-      )}
     </Box>
   );
 }

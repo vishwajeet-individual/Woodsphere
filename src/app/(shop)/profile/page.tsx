@@ -1,8 +1,8 @@
 import { auth, signOut } from '@/auth';
 import { prisma } from '@/lib/prisma';
-import { Box, Container, Typography, Card, Avatar, Stack, Button, Divider } from '@mui/material';
+import { Box, Container, Typography, Card, Avatar, Stack, Button, Chip } from '@mui/material';
 import Grid from '@mui/material/Grid'; // Classic Grid
-import { ShoppingBag, LocationOn, Settings, Logout } from '@mui/icons-material';
+import { ShoppingBag, LocationOn, Settings, Logout, Star } from '@mui/icons-material';
 import Link from 'next/link';
 import { redirect } from 'next/navigation';
 
@@ -35,7 +35,14 @@ export default async function ProfilePage() {
             <Box textAlign={{ xs: 'center', sm: 'left' }}>
               <Typography variant="h5" fontWeight={700}>{user.name}</Typography>
               <Typography color="text.secondary">{user.email}</Typography>
-              <Chip label={user.role || 'USER'} size="small" sx={{ mt: 1 }} />
+              
+              {/* ⚠️ FIX: Cast user to 'any' to access custom role */}
+              <Chip 
+                label={(user as any).role || 'USER'} 
+                size="small" 
+                sx={{ mt: 1, fontWeight: 600 }} 
+                variant="outlined"
+              />
             </Box>
             
             <Box sx={{ ml: { sm: 'auto' } }}>
@@ -52,6 +59,7 @@ export default async function ProfilePage() {
         </Card>
 
         <Grid container spacing={3}>
+          
           {/* Orders Card */}
           <Grid item xs={12} md={4}>
             <Link href="/orders" style={{ textDecoration: 'none' }}>
@@ -65,15 +73,30 @@ export default async function ProfilePage() {
             </Link>
           </Grid>
 
-          {/* Addresses Card (Placeholder link for now) */}
+          {/* ⚠️ Reviews Card (Added from previous step) */}
           <Grid item xs={12} md={4}>
-            <Card sx={{ p: 3, borderRadius: 3, height: '100%', opacity: 0.7 }}>
-              <LocationOn color="action" sx={{ fontSize: 40, mb: 2 }} />
-              <Typography variant="h6" fontWeight={700}>Addresses</Typography>
-              <Typography variant="body2" color="text.secondary">
-                Manage shipping details
-              </Typography>
-            </Card>
+            <Link href="/profile/reviews" style={{ textDecoration: 'none' }}>
+              <Card sx={{ p: 3, borderRadius: 3, height: '100%', transition: 'all 0.2s', '&:hover': { transform: 'translateY(-4px)' } }}>
+                <Star color="warning" sx={{ fontSize: 40, mb: 2 }} />
+                <Typography variant="h6" fontWeight={700}>My Reviews</Typography>
+                <Typography variant="body2" color="text.secondary">
+                  Rate your purchases
+                </Typography>
+              </Card>
+            </Link>
+          </Grid>
+
+          {/* Addresses Card (Placeholder link) */}
+          <Grid item xs={12} md={4}>
+            <Link href="/checkout" style={{ textDecoration: 'none' }}>
+              <Card sx={{ p: 3, borderRadius: 3, height: '100%', transition: 'all 0.2s', '&:hover': { transform: 'translateY(-4px)' } }}>
+                <LocationOn color="action" sx={{ fontSize: 40, mb: 2 }} />
+                <Typography variant="h6" fontWeight={700}>Addresses</Typography>
+                <Typography variant="body2" color="text.secondary">
+                  Manage shipping details
+                </Typography>
+              </Card>
+            </Link>
           </Grid>
 
           {/* Settings Card */}
@@ -91,9 +114,4 @@ export default async function ProfilePage() {
       </Container>
     </Box>
   );
-}
-
-// Helper Chip component if missing import
-function Chip({ label, ...props }: any) {
-    return <Box sx={{ display: 'inline-block', bgcolor: '#e0e0e0', px: 1, borderRadius: 1, fontSize: '0.75rem', fontWeight: 600, ...props.sx }}>{label}</Box>
 }

@@ -8,7 +8,7 @@ export default function PrintButton() {
   return (
     <Button 
       startIcon={<Print />} 
-      sx={{ borderRadius: 50 }}
+      sx={{ borderRadius: 8 }}
       onClick={() => window.print()} 
     >
       Print Invoice
