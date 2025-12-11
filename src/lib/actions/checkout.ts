@@ -2,7 +2,7 @@
 
 import { auth } from '@/auth';
 import { prisma } from '@/lib/prisma';
-import { Prisma } from '../../../generated/prisma';
+import { Prisma } from '@prisma/client';
 import crypto from 'crypto'; // Native Node.js crypto module
 
 const COMMISSION_RATE = 0.10;

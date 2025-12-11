@@ -1,7 +1,7 @@
 // src/lib/prisma.ts
 import { Pool } from 'pg';
 import { PrismaPg } from '@prisma/adapter-pg';
-import { PrismaClient } from '../../generated/prisma'; // Custom generated path
+import { PrismaClient } from '@prisma/client'; // Custom generated path
 
 const connectionString = `${process.env.DATABASE_URL}`;
 
