@@ -50,7 +50,10 @@ export default function RegisterPage() {
   // --- SUBMIT HANDLER ---
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!name) return toast.error("Please enter your name");
+    if (!name) {
+        toast.error("Please enter your name");
+        return;
+    }
 
     if (otpSent) {
         verifyOtp();
@@ -63,10 +66,18 @@ export default function RegisterPage() {
 
   const registerEmail = () => {
     startTransition(async () => {
-      if (password.length < 6) return toast.error("Password too short");
+      // ⚠️ FIX: Don't return toast result directly
+      if (password.length < 6) {
+         toast.error("Password too short");
+         return; 
+      }
       
       const res = await registerAction({ name, email: inputValue, password });
-      if (res?.error) return toast.error(res.error);
+      
+      if (res?.error) {
+         toast.error(res.error);
+         return;
+      }
       
       toast.success("Account created!");
       // Auto-login
@@ -195,4 +206,11 @@ export default function RegisterPage() {
       </Box>
     </Paper>
   );
+}
+
+// Ensure type augmentation
+declare global {
+  interface Window {
+    recaptchaVerifier: any;
+  }
 }

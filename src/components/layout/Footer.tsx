@@ -8,7 +8,7 @@ const DEFAULT_FOOTER_LINKS = [
 ];
 
 export default async function Footer() {
-  const settings = await getFooterSettings();
+  const settings: any = await getFooterSettings();
   
   // 1. Ensure columns exist
   let footerData = DEFAULT_FOOTER_LINKS;
