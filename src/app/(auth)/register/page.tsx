@@ -1,74 +1,121 @@
 'use client';
 
-import { useForm } from 'react-hook-form';
-import { zodResolver } from '@hookform/resolvers/zod';
-import { z } from 'zod';
-import { registerAction, loginAction } from '@/lib/actions/auth';
-import { useTransition, useState } from 'react';
+import { useState, useTransition, useEffect } from 'react';
+import { registerAction, loginWithPhoneAction, loginAction } from '@/lib/actions/auth';
+import { signIn } from 'next-auth/react';
 import { toast } from 'sonner';
-import { useRouter } from 'next/navigation';
-import { Box, Button, Paper, TextField, Typography, Link as MuiLink, ToggleButton, ToggleButtonGroup, Stack } from '@mui/material';
-import { Person, Store } from '@mui/icons-material';
+import { 
+  Box, Button, Paper, TextField, Typography, Link as MuiLink, 
+  InputAdornment, Divider, Collapse, ToggleButtonGroup, ToggleButton
+} from '@mui/material';
+import { Google, Person, Store } from '@mui/icons-material';
 import Link from 'next/link';
-
-const RegisterSchema = z.object({
-  name: z.string().min(2, "Name must be at least 2 characters"),
-  email: z.string().email("Invalid email address"),
-  password: z.string().min(6, "Password must be at least 6 characters"),
-});
+import { RecaptchaVerifier, signInWithPhoneNumber } from 'firebase/auth';
+import { firebaseAuth } from '@/lib/firebase';
+import { detectInputType } from '@/lib/utils';
+import { useRouter } from 'next/navigation';
 
 export default function RegisterPage() {
-  const [isPending, startTransition] = useTransition();
   const router = useRouter();
+  const [isPending, startTransition] = useTransition();
+  
+  // Form State
+  const [name, setName] = useState('');
+  const [inputValue, setInputValue] = useState('');
+  const [password, setPassword] = useState('');
+  const [inputType, setInputType] = useState<'email' | 'phone' | 'invalid'>('invalid');
   const [accountType, setAccountType] = useState<'buyer' | 'seller'>('buyer');
 
-  const form = useForm<z.infer<typeof RegisterSchema>>({
-    resolver: zodResolver(RegisterSchema),
-    defaultValues: { name: '', email: '', password: '' },
-  });
+  // OTP State
+  const [otpSent, setOtpSent] = useState(false);
+  const [otp, setOtp] = useState('');
+  const [confirmObj, setConfirmObj] = useState<any>(null);
 
-  const onSubmit = (values: z.infer<typeof RegisterSchema>) => {
+  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const val = e.target.value;
+    setInputValue(val);
+    setInputType(detectInputType(val));
+  };
+
+  // --- RECAPTCHA ---
+  useEffect(() => {
+    if (inputType === 'phone' && !window.recaptchaVerifier) {
+      window.recaptchaVerifier = new RecaptchaVerifier(firebaseAuth, 'recaptcha-reg-container', {
+        'size': 'invisible',
+        'callback': () => {}
+      });
+    }
+  }, [inputType]);
+
+  // --- SUBMIT HANDLER ---
+  const handleSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!name) return toast.error("Please enter your name");
+
+    if (otpSent) {
+        verifyOtp();
+    } else if (inputType === 'email') {
+        registerEmail();
+    } else if (inputType === 'phone') {
+        sendOtp();
+    }
+  };
+
+  const registerEmail = () => {
     startTransition(async () => {
-      // 1. Create Account
-      const res = await registerAction(values);
+      if (password.length < 6) return toast.error("Password too short");
       
-      if (res.error) {
-        toast.error(res.error);
-        return;
-      }
-
-      toast.success("Account created! Logging you in...");
-
-      // 2. Auto Login
-      // We catch the redirect error because NextAuth throws a redirect as an error
+      const res = await registerAction({ name, email: inputValue, password });
+      if (res?.error) return toast.error(res.error);
+      
+      toast.success("Account created!");
+      // Auto-login
       try {
-          await loginAction(values); // This will redirect to '/'
+        await loginAction({ email: inputValue, password });
       } catch (e) {
-          // If we are a seller, we want to intercept and go to /sell
-          if (accountType === 'seller') {
-             // Force client-side redirect to store setup
-             window.location.href = '/sell'; 
-             return;
-          }
-          // Otherwise allow standard redirect behavior
-          throw e;
+        if (accountType === 'seller') window.location.href = '/sell';
       }
     });
   };
 
-  return (
-    <Paper 
-      elevation={0}
-      sx={{ p: 4, borderRadius: 4, textAlign: 'center', boxShadow: '0 4px 20px rgba(0,0,0,0.05)' }}
-    >
-      <Typography variant="h5" fontWeight={700} gutterBottom>
-        Join Woodsphere
-      </Typography>
-      <Typography variant="body2" color="text.secondary" sx={{ mb: 3 }}>
-        Create an account to get started.
-      </Typography>
+  const sendOtp = async () => {
+    try {
+      toast.loading("Sending OTP...");
+      const formattedPhone = `+91${inputValue}`;
+      const confirmation = await signInWithPhoneNumber(firebaseAuth, formattedPhone, window.recaptchaVerifier);
+      toast.dismiss();
+      toast.success("OTP Sent!");
+      setConfirmObj(confirmation);
+      setOtpSent(true);
+    } catch (err: any) {
+      toast.dismiss();
+      toast.error(err.message || "Failed to send OTP");
+    }
+  };
 
-      {/* Account Type Toggle */}
+  const verifyOtp = async () => {
+    try {
+      toast.loading("Verifying...");
+      const res = await confirmObj.confirm(otp);
+      const idToken = await res.user.getIdToken();
+      
+      // Login/Create via Phone
+      await loginWithPhoneAction(idToken);
+      
+      // Redirect
+      if (accountType === 'seller') window.location.href = '/sell';
+      else window.location.href = '/';
+      
+    } catch (err) {
+      toast.dismiss();
+      toast.error("Invalid OTP");
+    }
+  };
+
+  return (
+    <Paper elevation={0} sx={{ p: 4, borderRadius: 4, textAlign: 'center', boxShadow: '0 4px 20px rgba(0,0,0,0.05)', maxWidth: 400, width: '100%' }}>
+      <Typography variant="h5" fontWeight={700} gutterBottom>Join Woodsphere</Typography>
+
       <ToggleButtonGroup
         value={accountType}
         exclusive
@@ -76,60 +123,74 @@ export default function RegisterPage() {
         fullWidth
         sx={{ mb: 3 }}
       >
-        <ToggleButton value="buyer" sx={{ borderRadius: 4, textTransform: 'none', py: 1 }}>
-           <Person sx={{ mr: 1, fontSize: 20 }} /> Customer
-        </ToggleButton>
-        <ToggleButton value="seller" sx={{ borderRadius: 4, textTransform: 'none', py: 1 }}>
-           <Store sx={{ mr: 1, fontSize: 20 }} /> Seller
-        </ToggleButton>
+        <ToggleButton value="buyer" sx={{ borderRadius: 4, textTransform: 'none' }}><Person sx={{ mr: 1 }} /> Customer</ToggleButton>
+        <ToggleButton value="seller" sx={{ borderRadius: 4, textTransform: 'none' }}><Store sx={{ mr: 1 }} /> Seller</ToggleButton>
       </ToggleButtonGroup>
 
-      <Box component="form" onSubmit={form.handleSubmit(onSubmit)} noValidate>
-        <TextField
-          margin="normal"
-          fullWidth
-          label={accountType === 'seller' ? "Business / Owner Name" : "Full Name"}
-          {...form.register("name")}
-          error={!!form.formState.errors.name}
-          helperText={form.formState.errors.name?.message}
-          disabled={isPending}
-        />
-        <TextField
-          margin="normal"
-          fullWidth
-          label="Email Address"
-          {...form.register("email")}
-          error={!!form.formState.errors.email}
-          helperText={form.formState.errors.email?.message}
-          disabled={isPending}
-        />
-        <TextField
-          margin="normal"
-          fullWidth
-          label="Password"
-          type="password"
-          {...form.register("password")}
-          error={!!form.formState.errors.password}
-          helperText={form.formState.errors.password?.message}
-          disabled={isPending}
+      <form onSubmit={handleSubmit}>
+        <TextField 
+          label="Full Name" 
+          fullWidth value={name} 
+          onChange={(e) => setName(e.target.value)} 
+          sx={{ mb: 2 }} 
+          disabled={otpSent}
         />
         
-        <Button
-          type="submit"
+        <TextField
+          label="Email or Mobile Number"
           fullWidth
-          variant="contained"
-          size="large"
-          sx={{ mt: 3, mb: 2, borderRadius: 8, py: 1.5 }}
-          disabled={isPending}
+          value={inputValue}
+          onChange={handleInputChange}
+          disabled={otpSent || isPending}
+          sx={{ mb: 2 }}
+          InputProps={{
+             startAdornment: inputType === 'phone' ? <InputAdornment position="start">+91</InputAdornment> : null
+          }}
+        />
+
+        <div id="recaptcha-reg-container"></div>
+
+        <Collapse in={inputType === 'email' && !otpSent}>
+            <TextField
+                label="Create Password"
+                type="password"
+                fullWidth
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                sx={{ mb: 2 }}
+            />
+        </Collapse>
+
+        <Collapse in={otpSent}>
+            <TextField
+                label="Enter OTP"
+                fullWidth
+                value={otp}
+                onChange={(e) => setOtp(e.target.value)}
+                sx={{ mb: 2 }}
+            />
+        </Collapse>
+
+        <Button 
+            type="submit" 
+            fullWidth 
+            variant="contained" 
+            size="large" 
+            disabled={inputType === 'invalid' || isPending}
+            sx={{ borderRadius: 50, py: 1.5 }}
         >
-          {isPending ? "Creating..." : (accountType === 'seller' ? "Continue to Store Setup" : "Sign Up")}
+            {isPending ? "Creating..." : otpSent ? "Verify & Join" : "Continue"}
         </Button>
-        
+      </form>
+
+      <Divider sx={{ my: 3 }}>OR</Divider>
+      <Button variant="outlined" fullWidth startIcon={<Google />} onClick={() => signIn("google", { callbackUrl: accountType === 'seller' ? '/sell' : '/' })} sx={{ borderRadius: 50, py: 1.5, borderColor: '#ddd', color: 'text.primary' }}>
+        Sign up with Google
+      </Button>
+
+      <Box mt={3}>
         <Typography variant="body2" color="text.secondary">
-          Already have an account?{' '}
-          <MuiLink component={Link} href="/login" underline="hover" fontWeight={600}>
-            Sign in
-          </MuiLink>
+          Already have an account? <MuiLink component={Link} href="/login" underline="hover" fontWeight={600}>Sign in</MuiLink>
         </Typography>
       </Box>
     </Paper>

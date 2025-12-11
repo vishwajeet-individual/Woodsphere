@@ -1,89 +1,241 @@
 'use client';
 
-import { useForm } from 'react-hook-form';
-import { zodResolver } from '@hookform/resolvers/zod';
-import { z } from 'zod';
-import { loginAction } from '@/lib/actions/auth';
-import { useTransition } from 'react';
+import { useState, useTransition, useEffect } from 'react';
+import { loginAction, loginWithPhoneAction } from '@/lib/actions/auth';
+import { signIn } from 'next-auth/react';
 import { toast } from 'sonner';
-import { Box, Button, Paper, TextField, Typography, Link as MuiLink } from '@mui/material';
+import { 
+  Box, Button, Paper, TextField, Typography, Link as MuiLink, 
+  InputAdornment, Divider, Collapse 
+} from '@mui/material';
+import { Google, ArrowForward } from '@mui/icons-material';
 import Link from 'next/link';
-
-const LoginSchema = z.object({
-  email: z.string().email("Invalid email address"),
-  password: z.string().min(1, "Password is required"),
-});
+import { RecaptchaVerifier, signInWithPhoneNumber } from 'firebase/auth';
+import { firebaseAuth } from '@/lib/firebase';
+import { detectInputType } from '@/lib/utils';
+import { useRouter } from 'next/navigation';
 
 export default function LoginPage() {
+  const router = useRouter();
+  const [inputValue, setInputValue] = useState('');
+  const [password, setPassword] = useState('');
+  const [inputType, setInputType] = useState<'email' | 'phone' | 'invalid'>('invalid');
   const [isPending, startTransition] = useTransition();
+  
+  // OTP State
+  const [otpSent, setOtpSent] = useState(false);
+  const [otp, setOtp] = useState('');
+  const [confirmObj, setConfirmObj] = useState<any>(null);
 
-  const form = useForm<z.infer<typeof LoginSchema>>({
-    resolver: zodResolver(LoginSchema),
-    defaultValues: { email: '', password: '' },
-  });
+  // --- Handlers ---
 
-  const onSubmit = (values: z.infer<typeof LoginSchema>) => {
+  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const val = e.target.value;
+    setInputValue(val);
+    setInputType(detectInputType(val));
+  };
+
+  // --- FLOW A: Email + Password ---
+  const handleEmailLogin = () => {
     startTransition(async () => {
-      const res = await loginAction(values);
-      if (res?.error) {
-        toast.error(res.error);
-      } else {
-        toast.success("Welcome back!");
-      }
+      const res = await loginAction({ email: inputValue, password });
+      if (res?.error) toast.error(res.error);
+      else toast.success("Welcome back!");
     });
   };
 
-  return (
-    <Paper 
-      elevation={0}
-      sx={{ p: 4, borderRadius: 4, textAlign: 'center', boxShadow: '0 4px 20px rgba(0,0,0,0.05)' }}
-    >
-      <Typography variant="h5" fontWeight={700} gutterBottom>
-        Welcome Back
-      </Typography>
-      <Typography variant="body2" color="text.secondary" sx={{ mb: 3 }}>
-        Login to manage your orders or store.
-      </Typography>
+  // --- FLOW B: Phone + OTP ---
+  useEffect(() => {
+    // Only init if phone mode active
+    if (inputType === 'phone') {
+      try {
+        // 1. CLEANUP: If an old verifier exists, destroy it first
+        if (window.recaptchaVerifier) {
+          try {
+            window.recaptchaVerifier.clear();
+            window.recaptchaVerifier = undefined;
+          } catch (e) {
+            console.warn("Recaptcha cleanup warning", e);
+          }
+        }
 
-      <Box component="form" onSubmit={form.handleSubmit(onSubmit)} noValidate>
-        <TextField
-          margin="normal"
-          fullWidth
-          label="Email Address"
-          {...form.register("email")}
-          error={!!form.formState.errors.email}
-          helperText={form.formState.errors.email?.message}
-          disabled={isPending}
-        />
-        <TextField
-          margin="normal"
-          fullWidth
-          label="Password"
-          type="password"
-          {...form.register("password")}
-          error={!!form.formState.errors.password}
-          helperText={form.formState.errors.password?.message}
-          disabled={isPending}
-        />
+        // 2. CHECK: Ensure DOM element exists before attaching
+        const container = document.getElementById('recaptcha-container');
+        if (container) {
+          window.recaptchaVerifier = new RecaptchaVerifier(firebaseAuth, 'recaptcha-container', {
+            'size': 'invisible',
+            'callback': () => {
+               // Captcha solved
+            },
+            'expired-callback': () => {
+               toast.error("Captcha expired. Please try again.");
+            }
+          });
+        }
+      } catch (e) {
+        console.error("Recaptcha Init Error", e);
+      }
+    }
+
+    // 3. UNMOUNT: Cleanup when user leaves page or switches input type
+    return () => {
+      if (window.recaptchaVerifier) {
+        try {
+          window.recaptchaVerifier.clear();
+          window.recaptchaVerifier = undefined;
+        } catch (e) {
+          // Ignore cleanup errors
+        }
+      }
+    };
+  }, [inputType]); // Re-run only when input type changes
+
+  const handleSendOtp = async () => {
+    try {
+      toast.loading("Sending OTP...");
+      const formattedPhone = `+91${inputValue}`;
+      const confirmation = await signInWithPhoneNumber(firebaseAuth, formattedPhone, window.recaptchaVerifier);
+      toast.dismiss();
+      toast.success("OTP Sent to " + formattedPhone);
+      setConfirmObj(confirmation);
+      setOtpSent(true);
+    } catch (err: any) {
+      toast.dismiss();
+      console.error(err);
+      toast.error(err.message || "Failed to send OTP. Try again.");
+      // Reset captcha if failed
+      if (window.recaptchaVerifier) {
+        window.recaptchaVerifier.clear();
+        window.recaptchaVerifier = undefined;
+      }
+    }
+  };
+
+  // ⚠️ FIXED VERIFICATION LOGIC
+  const handleVerifyOtp = async () => {
+    const toastId = toast.loading("Verifying...");
+    
+    try {
+      // 1. Verify with Firebase Client
+      const res = await confirmObj.confirm(otp);
+      const idToken = await res.user.getIdToken();
+
+      // 2. Login with NextAuth Server Action
+      // We expect this to redirect. If it returns, it might be an error or void.
+      const actionRes = await loginWithPhoneAction(idToken);
+      
+      // 3. Handle Fallback (If server didn't redirect automatically)
+      toast.dismiss(toastId);
+
+      if (actionRes?.error) {
+        toast.error(actionRes.error);
+      } else {
+        // Force client-side redirect if server action finished without error
+        toast.success("Login Successful!");
+        window.location.href = '/'; 
+      }
+
+    } catch (err: any) {
+      toast.dismiss(toastId);
+      
+      // ⚠️ CATCH REDIRECT ERROR: This is actually a SUCCESS
+      if (err.message === 'NEXT_REDIRECT' || err.message.includes('NEXT_REDIRECT')) {
+          window.location.href = '/';
+          return;
+      }
+
+      console.error(err);
+      toast.error("Invalid OTP or Login Failed");
+    }
+  };
+  
+  // --- Main Submit Logic ---
+  const handleSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (otpSent) return handleVerifyOtp();
+    if (inputType === 'email') return handleEmailLogin();
+    if (inputType === 'phone') return handleSendOtp();
+  };
+
+  return (
+    <Paper elevation={0} sx={{ p: 4, borderRadius: 4, textAlign: 'center', boxShadow: '0 4px 20px rgba(0,0,0,0.05)', maxWidth: 400, width: '100%' }}>
+      <Typography variant="h5" fontWeight={700} gutterBottom>Welcome Back</Typography>
+      <Typography variant="body2" color="text.secondary" mb={3}>Enter your email or mobile number to continue.</Typography>
+
+      <form onSubmit={handleSubmit}>
         
-        <Button
-          type="submit"
+        <TextField
+          label="Email or Mobile Number"
           fullWidth
-          variant="contained"
-          size="large"
-          sx={{ mt: 3, mb: 2, borderRadius: 8, py: 1.5 }}
-          disabled={isPending}
+          value={inputValue}
+          onChange={handleInputChange}
+          disabled={otpSent || isPending}
+          sx={{ mb: 2 }}
+          InputProps={{
+             startAdornment: inputType === 'phone' ? <InputAdornment position="start">+91</InputAdornment> : null
+          }}
+        />
+
+        <div id="recaptcha-container"></div>
+
+        {/* Case 1: Email -> Show Password */}
+        <Collapse in={inputType === 'email'}>
+            <TextField
+                label="Password"
+                type="password"
+                fullWidth
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                sx={{ mb: 2 }}
+            />
+        </Collapse>
+
+        {/* Case 2: Phone -> Show OTP Input after sending */}
+        <Collapse in={otpSent}>
+            <TextField
+                label="Enter OTP"
+                fullWidth
+                value={otp}
+                onChange={(e) => setOtp(e.target.value)}
+                sx={{ mb: 2 }}
+                autoFocus
+            />
+        </Collapse>
+
+        <Button 
+            type="submit" 
+            fullWidth 
+            variant="contained" 
+            size="large" 
+            disabled={inputType === 'invalid' || isPending}
+            sx={{ borderRadius: 50, py: 1.5 }}
+            endIcon={!otpSent ? <ArrowForward /> : null}
         >
-          {isPending ? "Authenticating..." : "Sign In"}
+            {isPending ? "Processing..." : 
+              otpSent ? "Verify & Login" : 
+              inputType === 'email' ? "Sign In with Password" : 
+              inputType === 'phone' ? "Get OTP" : "Continue"}
         </Button>
-        
+
+      </form>
+
+      <Divider sx={{ my: 3 }}>OR</Divider>
+
+      <Button 
+        variant="outlined" fullWidth startIcon={<Google />} 
+        onClick={() => signIn("google", { callbackUrl: "/" })}
+        sx={{ borderRadius: 50, py: 1.5, borderColor: '#ddd', color: 'text.primary' }}
+      >
+        Continue with Google
+      </Button>
+
+      <Box mt={3}>
         <Typography variant="body2" color="text.secondary">
-          New to Woodsphere?{' '}
-          <MuiLink component={Link} href="/register" underline="hover" fontWeight={600}>
-            Create an account
-          </MuiLink>
+          New here? <MuiLink component={Link} href="/register" underline="hover" fontWeight={600}>Create account</MuiLink>
         </Typography>
       </Box>
     </Paper>
   );
 }
+
+declare global { interface Window { recaptchaVerifier: any; } }

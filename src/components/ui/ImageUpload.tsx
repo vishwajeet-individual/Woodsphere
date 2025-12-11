@@ -1,7 +1,7 @@
 'use client';
 
-import { Box, Button, Stack, Typography, IconButton } from '@mui/material';
-import { CloudUpload, Delete } from '@mui/icons-material';
+import { Box, Button, Stack, IconButton } from '@mui/material';
+import { CloudUpload, Delete, Movie } from '@mui/icons-material';
 import { CldUploadWidget } from 'next-cloudinary';
 import Image from 'next/image';
 import { useState, useEffect } from 'react';
@@ -20,17 +20,17 @@ export default function ImageUpload({ value, onChange, onRemove }: ImageUploadPr
   }, []);
 
   const onUpload = (result: any) => {
-    // Cloudinary returns the secure_url
     onChange(result.info.secure_url);
   };
 
-  if (!isMounted) return null; // Hydration fix
+  if (!isMounted) return null;
+
+  const isVideo = value?.match(/\.(mp4|webm|ogg)$/i) || value?.includes('/video/upload');
 
   return (
     <Box>
       <Stack spacing={2}>
         
-        {/* Preview Area */}
         {value && (
           <Box 
             sx={{ 
@@ -39,74 +39,63 @@ export default function ImageUpload({ value, onChange, onRemove }: ImageUploadPr
                 height: 200, 
                 borderRadius: 2, 
                 overflow: 'hidden', 
-                border: '1px solid #eee' 
+                border: '1px solid #eee',
+                bgcolor: '#000'
             }}
           >
             <IconButton 
                 size="small" 
                 onClick={() => onRemove(value)}
                 sx={{ 
-                    position: 'absolute', 
-                    top: 5, 
-                    right: 5, 
-                    zIndex: 10, 
-                    bgcolor: 'error.main', 
-                    color: 'white',
+                    position: 'absolute', top: 5, right: 5, zIndex: 10, 
+                    bgcolor: 'error.main', color: 'white',
                     '&:hover': { bgcolor: 'error.dark' }
                 }}
             >
                 <Delete fontSize="small" />
             </IconButton>
-            <Image 
-                fill 
-                style={{ objectFit: 'cover' }} 
-                alt="Product Image" 
-                src={value} 
-            />
+
+            {isVideo ? (
+                // ⚠️ Fix: Use Box component="video" with sx
+                <Box 
+                    component="video"
+                    src={value} 
+                    autoPlay 
+                    muted 
+                    loop 
+                    sx={{ width: '100%', height: '100%', objectFit: 'cover' }}
+                />
+            ) : (
+                <Image 
+                    fill 
+                    style={{ objectFit: 'cover' }} 
+                    alt="Media" 
+                    src={value} 
+                />
+            )}
           </Box>
         )}
 
-        {/* Upload Button Wrapper */}
         <CldUploadWidget 
             onSuccess={onUpload} 
-            uploadPreset="woodsphere_preset" // ⚠️ Must match your Unsigned Preset Name
+            uploadPreset="woodsphere_preset" 
             options={{
                 maxFiles: 1,
-                sources: ['local', 'url', 'camera'],
-                styles: {
-                    palette: {
-                        window: "#FFFFFF",
-                        windowBorder: "#90A0B3",
-                        tabIcon: "#0071E3", // Apple Blue
-                        menuIcons: "#5A616A",
-                        textDark: "#000000",
-                        textLight: "#FFFFFF",
-                        link: "#0071E3",
-                        action: "#FF620C",
-                        inactiveTabIcon: "#0E2F5A",
-                        error: "#F44235",
-                        inProgress: "#0078FF",
-                        complete: "#20B832",
-                        sourceBg: "#E4EBF1"
-                    }
-                }
+                resourceType: "auto",
+                clientAllowedFormats: ["image", "video"],
+                sources: ['local', 'url'],
             }}
         >
           {({ open }) => {
             return (
               <Button 
                 variant="outlined" 
-                startIcon={<CloudUpload />}
+                startIcon={isVideo ? <Movie /> : <CloudUpload />}
                 onClick={() => open()}
                 fullWidth={false}
-                sx={{ 
-                    width: 'fit-content', 
-                    borderStyle: 'dashed', 
-                    borderWidth: 2, 
-                    textTransform: 'none' 
-                }}
+                sx={{ width: 'fit-content', borderStyle: 'dashed', borderWidth: 2 }}
               >
-                Upload Image
+                {value ? "Change Media" : "Upload Image or Video"}
               </Button>
             );
           }}

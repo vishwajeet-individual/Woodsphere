@@ -38,7 +38,9 @@ enum OrderStatus {
 model User {
   id            String    @id @default(cuid())
   name          String?
-  email         String    @unique
+  email         String?    @unique
+  emailVerified DateTime?
+  phone         String?   @unique
   password      String?
   role          Role      @default(USER)
   image         String?
@@ -51,9 +53,31 @@ model User {
   orders        Order[]   
   reviews       Review[]
   cart          Cart?
+
+  accounts      Account[]
   
   createdAt     DateTime  @default(now())
   updatedAt     DateTime  @updatedAt
+}
+
+// NEW: Required for Google OAuth
+model Account {
+  id                String  @id @default(cuid())
+  userId            String
+  type              String
+  provider          String
+  providerAccountId String
+  refresh_token     String? @db.Text
+  access_token      String? @db.Text
+  expires_at        Int?
+  token_type        String?
+  scope             String?
+  id_token          String? @db.Text
+  session_state     String?
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([provider, providerAccountId])
 }
 
 // --- VENDOR SYSTEM ---
@@ -244,11 +268,18 @@ model CartItem {
 // Global Configuration (Singleton pattern: ID will always be 'config')
 model SiteSettings {
   id          String   @id @default("config")
-  // Footer Config
-  footerConfig Json?
   
+  // ⚠️ NEW: Header Configuration
+  // Structure: { logoText: string, logoImage: string, navigation: [ { label, slug, icon, isSale, subs: [] } ] }
+  headerConfig     Json?
+
   // NEW: Hero Config (Title, Image, Link)
-  heroConfig   Json?   
+  heroConfig   Json? 
+
+  promoBannerConfig Json?   // { title, subtitle, buttonText, link, backgroundColor }
+  
+    // Footer Config
+  footerConfig Json?
   
   updatedAt   DateTime @updatedAt
 }

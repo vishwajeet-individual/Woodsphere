@@ -36,7 +36,11 @@ async function getHomepageData() {
     prisma.siteSettings.findUnique({ where: { id: 'config' } })
   ]);
 
-  return { categories, bestSellers, saleItems, reviews, heroConfig: settings?.heroConfig };
+  return { 
+    categories, bestSellers, saleItems, reviews, 
+    heroConfig: settings?.heroConfig,
+    bannerConfig: settings?.promoBannerConfig
+  };
 }
 
 export default async function Home() {
@@ -50,9 +54,9 @@ export default async function Home() {
 
       <Stack spacing={6} sx={{ mt: 6, mb: 0 }}>
         
-        {/* Sales */}
+        {/* 4. Promotional Banner (Dynamic) */}
         <Container maxWidth="xl">
-           <SaleBanner />
+           <SaleBanner data={data.bannerConfig} />
         </Container>
 
         <Container maxWidth="xl">

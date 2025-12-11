@@ -13,6 +13,20 @@ const RegisterSchema = z.object({
   password: z.string().min(6),
 });
 
+export async function loginWithPhoneAction(idToken: string) {
+  try {
+    await signIn("credentials", {
+      idToken,
+      redirectTo: '/',
+    });
+  } catch (error) {
+    if (error instanceof AuthError) {
+       return { error: "Verification failed" };
+    }
+    throw error;
+  }
+}
+
 export async function registerAction(values: any) {
   const validated = RegisterSchema.safeParse(values);
   if (!validated.success) return { error: "Invalid fields" };

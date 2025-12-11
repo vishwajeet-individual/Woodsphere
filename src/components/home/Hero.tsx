@@ -10,19 +10,16 @@ const fadeUp = keyframes`
   to { opacity: 1; transform: translateY(0); }
 `;
 
-// --- ROBUST DEFAULTS (Used if DB is empty) ---
 const DEFAULT_HERO = {
   heading: "Crafting the future of your home.",
-  subHeading: "Discover a world where sustainable materials meet timeless design. Premium furniture, curated for clarity and comfort.",
+  subHeading: "Discover a world where sustainable materials meet timeless design.",
   imageUrl: "https://images.unsplash.com/photo-1616486338812-3dadae4b4f9d?q=80&w=2070&auto=format&fit=crop",
   ctaText: "Shop Collection",
   ctaLink: "/search"
 };
 
-// Pass image via props to style
-const HeroSection = styled(Box, {
-  shouldForwardProp: (prop) => prop !== 'bgImage', 
-})<{ bgImage: string }>(({ theme, bgImage }) => ({
+// 1. Container (No longer handles the image directly)
+const HeroContainer = styled(Box)(({ theme }) => ({
   position: 'relative',
   height: '85vh',
   minHeight: '600px',
@@ -33,13 +30,24 @@ const HeroSection = styled(Box, {
   textAlign: 'center',
   color: '#fff',
   overflow: 'hidden',
-  backgroundImage: `url('${bgImage}')`,
-  backgroundSize: 'cover',
-  backgroundPosition: 'center',
-  backgroundAttachment: 'fixed',
+  backgroundColor: '#000', // Fallback color
   [theme.breakpoints.down('md')]: {
-    backgroundAttachment: 'scroll',
     height: '70vh',
+  }
+}));
+
+// 2. The Media Layer (Handles Image or Video positioning)
+const MediaLayer = styled(Box)(({ theme }) => ({
+  position: 'absolute',
+  top: 0,
+  left: 0,
+  width: '100%',
+  height: '100%',
+  zIndex: 0,
+  '& video, & img': {
+    width: '100%',
+    height: '100%',
+    objectFit: 'cover',
   }
 }));
 
@@ -54,16 +62,45 @@ const ContentBox = styled(Container)(({ theme }) => ({
   animation: `${fadeUp} 1s cubic-bezier(0.2, 0.8, 0.2, 1) forwards`,
 }));
 
-// Accept Data Prop (Optional)
 export default function Hero({ data }: { data?: any }) {
-  // ⚠️ Safety Check: Use DB data, otherwise use Default
   const content = data || DEFAULT_HERO;
+  const mediaUrl = content.imageUrl;
+
+  // 🧠 Smart Detection: Is it a video?
+  const isVideo = mediaUrl?.match(/\.(mp4|webm|ogg)$/i) || mediaUrl?.includes('/video/upload');
 
   return (
-    <HeroSection bgImage={content.imageUrl}>
+    <HeroContainer>
+      
+      {/* ⚠️ BACKGROUND MEDIA LAYER */}
+      <MediaLayer>
+        {isVideo ? (
+          <video 
+            src={mediaUrl} 
+            autoPlay 
+            muted 
+            loop 
+            playsInline 
+            poster={DEFAULT_HERO.imageUrl} // Fallback image while loading
+          />
+        ) : (
+          // Use standard img tag or div background for parallax support
+          <Box 
+            sx={{
+               width: '100%', height: '100%',
+               backgroundImage: `url('${mediaUrl}')`,
+               backgroundSize: 'cover',
+               backgroundPosition: 'center',
+               backgroundAttachment: 'fixed', // Parallax (Desktop only)
+               '@media (max-width: 900px)': { backgroundAttachment: 'scroll' }
+            }} 
+          />
+        )}
+      </MediaLayer>
+
       <Overlay />
+      
       <ContentBox maxWidth="lg">
-        
         <Box sx={{ display: 'inline-block', py: 0.5, px: 2, mb: 3, borderRadius: 2, border: '1px solid rgba(255,255,255,0.3)', bgcolor: 'rgba(0,0,0,0.3)', backdropFilter: 'blur(4px)' }}>
           <Typography variant="caption" fontWeight={700} letterSpacing={1} textTransform="uppercase">
             New Collection 2025
@@ -91,8 +128,7 @@ export default function Hero({ data }: { data?: any }) {
         >
           {content.ctaText}
         </Button>
-
       </ContentBox>
-    </HeroSection>
+    </HeroContainer>
   );
 }
