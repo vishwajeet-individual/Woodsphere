@@ -103,7 +103,7 @@ export default function Hero({ data }: { data?: any }) {
       <ContentBox maxWidth="lg">
         <Box sx={{ display: 'inline-block', py: 0.5, px: 2, mb: 3, borderRadius: 2, border: '1px solid rgba(255,255,255,0.3)', bgcolor: 'rgba(0,0,0,0.3)', backdropFilter: 'blur(4px)' }}>
           <Typography variant="caption" fontWeight={700} letterSpacing={1} textTransform="uppercase">
-            New Collection 2025
+            Welcome to Woodsphere.
           </Typography>
         </Box>
 

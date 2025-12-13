@@ -13,10 +13,13 @@ const adapter = new PrismaPg(pool);
 const prisma = new PrismaClient({ adapter });
 
 // --- HELPERS ---
+// Using a standard, reliable format for Unsplash content images
 const getUnsplash = (term: string) =>
   `https://images.unsplash.com/photo-${term}?auto=format&fit=crop&w=800&q=80`;
+
+// FIX: Using a reliable Unsplash image for the generic size chart placeholder
 const SIZE_CHART_URL =
-  'https://images.unsplash.com/photo-1586023492125-27b2c045efd7?auto=format&fit=crop&w=800&q=80&text=Size+Chart';
+  'https://images.unsplash.com/photo-1542861205-d1430c51b75c?auto=format&fit=crop&w=800&q=80&text=Size+Chart';
 
 // --- DATA ---
 const PRODUCTS = [
@@ -33,9 +36,10 @@ const PRODUCTS = [
       'Designed by artisans in Jaipur, this sofa was inspired by the monsoon clouds. The fabric is hand-stitched to ensure every seam tells a story of precision.',
     materialOrigin: 'Cotton from Gujarat, Frame from Assam Teak',
     images: [
+      // Working Sofa Images
       'https://images.unsplash.com/photo-1555041469-a586c61ea9bc?w=800&q=80',
-      'https://images.unsplash.com/photo-1550226891-ef816aed4a98?w=800&q=80',
-      'https://images.unsplash.com/photo-1493663284031-b7e3aefcae8e?w=800&q=80',
+      'https://images.unsplash.com/photo-1618220054915-d1acb1952573?w=800&q=80',
+      'https://images.unsplash.com/photo-1596541223130-5d31a73cb6cf?w=800&q=80',
       SIZE_CHART_URL,
     ],
   },
@@ -50,8 +54,9 @@ const PRODUCTS = [
     story: 'This chair pays homage to the 1950s Bombay Art Deco movement.',
     materialOrigin: 'Mysore Silk Velvet',
     images: [
-      'https://images.unsplash.com/photo-1567538096630-e994826720d2?w=800&q=80',
-      'https://images.unsplash.com/photo-1586023492125-27b2c045efd7?w=800&q=80',
+      // FIX: Replaced broken link with working chair image
+      'https://images.unsplash.com/photo-1567016376408-0226e43cb32a?w=800&q=80', 
+      'https://images.unsplash.com/photo-1582582877994-081e7d23d858?w=800&q=80',
       SIZE_CHART_URL,
     ],
   },
@@ -97,8 +102,9 @@ const PRODUCTS = [
     story: 'Hand-tufted by third-generation craftsmen.',
     materialOrigin: 'Linen from Belgium',
     images: [
-      'https://images.unsplash.com/photo-1505693416388-b0346ef4174d?w=800&q=80',
-      'https://images.unsplash.com/photo-1522771753035-4a50423a5a63?w=800&q=80',
+      // FIX: Replaced broken links with known working bed images
+      'https://images.unsplash.com/photo-1578401311032-2d2975c742c3?w=800&q=80',
+      'https://images.unsplash.com/photo-1586738980387-9d7e35b0266f?w=800&q=80',
       SIZE_CHART_URL,
     ],
   },
@@ -127,13 +133,14 @@ async function main() {
     {
       name: 'Living Room',
       slug: 'living-room',
-      img: '1555041469-a586c61ea9bc',
+      img: '1555041469-a586c61ea9bc', // Sofa image
       subs: ['Sofas & Seating', 'Coffee & Side Tables', 'TV Units', 'Storage'],
     },
     {
       name: 'Bedroom',
       slug: 'bedroom',
-      img: '1505693416388-b0346ef4174d',
+      // FIX: Replaced broken image ID with working bedroom image ID
+      img: '1583847841793-13847895e69e', 
       subs: ['Beds', 'Mattresses', 'Wardrobes', 'Bedside Tables'],
     },
     {
@@ -289,6 +296,7 @@ async function main() {
             subs: [
               { label: 'Dining Sets', slug: 'dining-sets' },
               { label: 'Chairs', slug: 'chairs-benches' },
+              { label: 'Bar Furniture', slug: 'bar-furniture' },
             ],
           },
           {
@@ -367,6 +375,7 @@ async function main() {
             subs: [
               { label: 'Dining Sets', slug: 'dining-sets' },
               { label: 'Chairs', slug: 'chairs-benches' },
+              { label: 'Bar Furniture', slug: 'bar-furniture' },
             ],
           },
           {
@@ -404,6 +413,186 @@ async function main() {
       },
     },
   });
+
+  console.log("📝 Seeding Content Pages...");
+
+  const SUPPORT_PAGES = [
+    {
+      slug: "returns-refunds",
+      title: "Returns & Refunds",
+      category: "HELP",
+      content: `
+        <h2>Hassle-Free Returns</h2>
+        <p>We want you to love your Woodsphere purchase. If you're not completely satisfied, you can return most items within 7 days of delivery.</p>
+        <h3>Eligibility</h3>
+        <ul>
+          <li>Items must be in original condition.</li>
+          <li>Custom-made furniture is non-returnable.</li>
+        </ul>
+        <h3>Refund Process</h3>
+        <p>Once we receive your item, inspecting it takes 2-3 business days. Refunds are processed to your original payment method within 5-7 business days.</p>
+      `
+    },
+    {
+      slug: "shipping-delivery",
+      title: "Shipping & Delivery",
+      category: "HELP",
+      content: `
+        <h2>Delivery Information</h2>
+        <p>We offer free standard shipping on all orders above ₹5000.</p>
+        <h3>Estimated Timelines</h3>
+        <ul>
+          <li><strong>Metro Cities:</strong> 3-5 Business Days</li>
+          <li><strong>Rest of India:</strong> 7-10 Business Days</li>
+        </ul>
+      `
+    },
+    {
+      slug: "warranty-assembly",
+      title: "Warranty & Assembly",
+      category: "HELP",
+      content: `
+        <h2>Woodsphere Warranty</h2>
+        <p>All our furniture comes with a standard 1-year warranty against manufacturing defects.</p>
+        <h2>Assembly Services</h2>
+        <p>We provide free expert assembly for Beds, Wardrobes, and Dining Sets at the time of delivery.</p>
+      `
+    },
+    {
+      slug: "faqs",
+      title: "Frequently Asked Questions",
+      category: "HELP",
+      content: `
+        <h3>Do you ship internationally?</h3>
+        <p>Currently, we only ship within India.</p>
+        <h3>Can I customize the fabric?</h3>
+        <p>Yes! Visit our 'Custom Orders' page for more details on bespoke furniture.</p>
+      `
+    }
+  ];
+
+  for (const page of SUPPORT_PAGES) {
+    await prisma.contentPage.upsert({
+      where: { slug: page.slug },
+      update: {}, // Don't overwrite if exists (preserves admin edits)
+      create: page
+    });
+  }
+
+  const COMPANY_PAGES = [
+    {
+      slug: "about-us",
+      title: "About Woodsphere",
+      category: "COMPANY",
+      content: `
+        <h2>Designed for Living. Built for Life.</h2>
+        <p>Woodsphere began with a simple idea: furniture shouldn't just fill a space; it should define it. Born in 2024, we bridge the gap between artisanal craftsmanship and modern digital convenience.</p>
+        <p>We partner directly with master carpenters across India, cutting out middlemen to bring you premium teak and oak furniture at honest prices.</p>
+        <h3>Our Mission</h3>
+        <p>To make sustainable, heirloom-quality furniture accessible to every modern Indian home.</p>
+      `
+    },
+    {
+      slug: "careers",
+      title: "Join Our Team",
+      category: "COMPANY",
+      content: `
+        <h2>Build the Future of Furniture</h2>
+        <p>We are always looking for passionate designers, developers, and logistics experts.</p>
+        <h3>Open Positions</h3>
+        <ul>
+          <li><strong>Senior Product Designer</strong> - Bangalore (On-site)</li>
+          <li><strong>Full Stack Engineer</strong> - Remote</li>
+          <li><strong>Supply Chain Manager</strong> - Delhi (Hybrid)</li>
+        </ul>
+        <p>Send your portfolio to <strong>careers@woodsphere.com</strong></p>
+      `
+    },
+    {
+      slug: "sustainability",
+      title: "Sustainability & Materials",
+      category: "COMPANY",
+      content: `
+        <h2>Conscious Craftsmanship</h2>
+        <p>We believe in responsible luxury. 100% of our wood is sourced from government-certified sustainable plantations.</p>
+        <h3>Zero Plastic Packaging</h3>
+        <p>We have eliminated single-use plastics from our delivery chain, opting for recycled honeycomb paper and biodegradable wraps.</p>
+      `
+    },
+    {
+        slug: "affiliate-program",
+        title: "Affiliate Program",
+        category: "COMPANY",
+        content: `
+          <h2>Partner with Us</h2>
+          <p>Are you an interior designer or home decor influencer? Join the Woodsphere Affiliate Program and earn 10% commission on every sale.</p>
+          <p>Contact <strong>partners@woodsphere.com</strong> to apply.</p>
+        `
+    }
+  ];
+
+  const LEGAL_PAGES = [
+    {
+      slug: "terms-conditions",
+      title: "Terms & Conditions",
+      category: "LEGAL",
+      content: `
+        <p><strong>Last Updated: Dec 2025</strong></p>
+        <p>Welcome to Woodsphere. By accessing our website, you agree to be bound by these terms.</p>
+        <h3>1. Use of Services</h3>
+        <p>You must be at least 18 years old to use our services. Account security is your responsibility.</p>
+        <h3>2. Pricing & Payments</h3>
+        <p>Prices are inclusive of GST. We reserve the right to change prices without notice.</p>
+      `
+    },
+    {
+      slug: "privacy-policy",
+      title: "Privacy Policy",
+      category: "LEGAL",
+      content: `
+        <h2>Your Privacy Matters</h2>
+        <p>We collect only the information necessary to process your order and improve your experience.</p>
+        <h3>Data We Collect</h3>
+        <ul>
+          <li>Contact Information (Name, Email, Phone)</li>
+          <li>Shipping Address</li>
+          <li>Payment History (we do not store card details)</li>
+        </ul>
+      `
+    },
+    {
+      slug: "cancellation-policy",
+      title: "Cancellation Policy",
+      category: "LEGAL",
+      content: `
+        <h2>Order Cancellations</h2>
+        <p>You can cancel your order within 24 hours of placement for a full refund.</p>
+        <p>After 24 hours, a processing fee of 5% may apply as our artisans begin material allocation immediately.</p>
+        <p>Orders cannot be cancelled once shipped.</p>
+      `
+    },
+    {
+      slug: "cookie-policy",
+      title: "Cookie Policy",
+      category: "LEGAL",
+      content: `
+        <p>We use cookies to personalize content and analyze our traffic. By using our site, you consent to our use of cookies.</p>
+      `
+    }
+  ];
+
+  // Combine all pages
+  const ALL_PAGES = [...SUPPORT_PAGES, ...COMPANY_PAGES, ...LEGAL_PAGES];
+
+  for (const page of ALL_PAGES) {
+    await prisma.contentPage.upsert({
+      where: { slug: page.slug },
+      update: {}, 
+      create: page
+    });
+  }
+
+  console.log("✅ Content Pages Seeded.");
 
   console.log('✅ V3 Data Injected Successfully.');
 }

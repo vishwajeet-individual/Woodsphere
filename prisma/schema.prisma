@@ -278,8 +278,29 @@ model SiteSettings {
 
   promoBannerConfig Json?   // { title, subtitle, buttonText, link, backgroundColor }
   
+  categoryGridConfig  Json?    @default("[]")
+
     // Footer Config
   footerConfig Json?
   
   updatedAt   DateTime @updatedAt
+}
+
+model ContentPage {
+  id        String   @id @default(cuid())
+  slug      String   @unique // e.g. "returns-policy", "about-us"
+  title     String   // e.g. "Returns & Refunds"
+  content   String   @db.Text // HTML or Markdown content
+  category  String   // "HELP", "COMPANY", "LEGAL"
+  
+  updatedAt DateTime @updatedAt
+}
+
+model PasswordResetToken {
+  id      String   @id @default(cuid())
+  email   String
+  token   String   @unique
+  expires DateTime
+
+  @@unique([email, token])
 }

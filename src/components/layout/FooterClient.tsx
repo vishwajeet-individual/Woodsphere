@@ -34,13 +34,13 @@ function SocialIcon({ href, children, label }: { href?: string, children: React.
           rel="noopener noreferrer"
           aria-label={label} // ⚠️ Fixes "Links must have discernible text"
           sx={{
-              color: isLink ? 'inherit' : 'rgba(255,255,255,0.2)',
-              cursor: isLink ? 'pointer' : 'default',
-              display: 'flex',
-              alignItems: 'center',
-              textDecoration: 'none',
-              transition: 'color 0.2s',
-              '&:hover': { color: isLink ? '#fff' : 'rgba(255,255,255,0.2)' } // ⚠️ Fixes "no inline styles"
+            color: isLink ? 'inherit' : 'rgba(255,255,255,0.2)',
+            cursor: isLink ? 'pointer' : 'default',
+            display: 'flex',
+            alignItems: 'center',
+            textDecoration: 'none',
+            transition: 'color 0.2s',
+            '&:hover': { color: isLink ? '#fff' : 'rgba(255,255,255,0.2)' } // ⚠️ Fixes "no inline styles"
           }}
       >
           {children}
@@ -68,7 +68,8 @@ export default function FooterClient({ data, socials }: { data: any[], socials: 
         {/* --- DESKTOP VIEW --- */}
         <Grid container spacing={4} sx={{ display: { xs: 'none', md: 'flex' } }}>
           {data.map((column, idx) => (
-            <Grid item xs={3} key={column.title || idx}>
+            // ⚠️ FIX: Use combined key for uniqueness
+            <Grid item xs={3} key={`${column.title}-${idx}`}>
               <Typography 
                 variant="subtitle2" 
                 sx={{ 
@@ -85,7 +86,8 @@ export default function FooterClient({ data, socials }: { data: any[], socials: 
               
               {column.links.map((link: any, i: number) => (
                 <FooterLinkItem 
-                  key={link.name || i} 
+                  // ⚠️ FIX: Use combined key for inner links
+                  key={`${link.name}-${i}`} 
                   href={link.href}
                   color={link.color}
                 >
@@ -99,8 +101,9 @@ export default function FooterClient({ data, socials }: { data: any[], socials: 
         {/* --- MOBILE VIEW --- */}
         <Box sx={{ display: { xs: 'block', md: 'none' } }}>
           {data.map((column, idx) => (
+            // ⚠️ FIX: Use combined key for uniqueness
             <Accordion 
-              key={column.title || idx} 
+              key={`${column.title}-${idx}`} 
               disableGutters 
               elevation={0}
               sx={{ bgcolor: 'transparent', color: '#fff', borderBottom: '1px solid #333' }}
@@ -111,12 +114,13 @@ export default function FooterClient({ data, socials }: { data: any[], socials: 
               <AccordionDetails>
                 {column.links.map((link: any, i: number) => (
                    <FooterLinkItem 
-                     key={link.name || i} 
-                     href={link.href} 
-                     color={link.color}
-                   >
-                     {link.name}
-                   </FooterLinkItem>
+                      // ⚠️ FIX: Use combined key for inner links
+                      key={`${link.name}-${i}`} 
+                      href={link.href} 
+                      color={link.color}
+                    >
+                      {link.name}
+                    </FooterLinkItem>
                 ))}
               </AccordionDetails>
             </Accordion>
@@ -137,9 +141,10 @@ export default function FooterClient({ data, socials }: { data: any[], socials: 
           </Typography>
           
           <Stack direction="row" spacing={2} sx={{ color: '#86868b' }}>
-             <Typography variant="caption" sx={{ border: '1px solid #333', px: 1, borderRadius: 1 }}>UPI</Typography>
-             <Typography variant="caption" sx={{ border: '1px solid #333', px: 1, borderRadius: 1 }}>VISA</Typography>
-             <Typography variant="caption" sx={{ border: '1px solid #333', px: 1, borderRadius: 1 }}>MASTERCARD</Typography>
+            {/* The original payment methods were just text boxes */}
+            <Typography variant="caption" sx={{ border: '1px solid #333', px: 1, borderRadius: 1 }}>UPI</Typography>
+            <Typography variant="caption" sx={{ border: '1px solid #333', px: 1, borderRadius: 1 }}>VISA</Typography>
+            <Typography variant="caption" sx={{ border: '1px solid #333', px: 1, borderRadius: 1 }}>MASTERCARD</Typography>
           </Stack>
 
           {/* Socials using the new helper */}

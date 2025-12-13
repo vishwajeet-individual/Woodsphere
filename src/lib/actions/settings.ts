@@ -28,44 +28,63 @@ const DEFAULT_FOOTER = {
 // --- GETTERS ---
 
 export async function getSiteSettings() {
-  const settings = await prisma.siteSettings.findUnique({ where: { id: 'config' } });
+  const settings = await prisma.siteSettings.findFirst(); // Changed to findFirst to match your new logic
   return {
-    hero: settings?.heroConfig || DEFAULT_HERO,
-    banner: settings?.promoBannerConfig || DEFAULT_BANNER,
-    footer: settings?.footerConfig || DEFAULT_FOOTER
+    heroConfig: settings?.heroConfig || DEFAULT_HERO,
+    promoBannerConfig: settings?.promoBannerConfig || DEFAULT_BANNER,
+    footerConfig: settings?.footerConfig || DEFAULT_FOOTER,
+    // ⚠️ Added this so the Editor can actually READ the saved images
+    categoryGridConfig: settings?.categoryGridConfig || {} 
   };
 }
 
 export async function getFooterSettings() {
-  const settings = await prisma.siteSettings.findUnique({ where: { id: 'config' } });
+  const settings = await prisma.siteSettings.findFirst();
   // @ts-ignore
   return settings?.footerConfig || DEFAULT_FOOTER;
 }
 
 export async function getHeaderSettings() {
-  const settings = await prisma.siteSettings.findUnique({ where: { id: 'config' } });
+  const settings = await prisma.siteSettings.findFirst();
   // @ts-ignore
   return settings?.headerConfig || {};
 }
 
 // --- SETTERS ---
 
-export async function updateHomeSettings(heroData: any, bannerData: any) {
+// ⚠️ FIXED: Now accepts categoryImages as the 3rd argument
+export async function updateHomeSettings(hero: any, banner: any, categoryImages: any) {
   const session = await auth();
   // @ts-ignore
   if (session?.user?.role !== 'SUPER_ADMIN') return { error: "Unauthorized" };
 
   try {
-    await prisma.siteSettings.upsert({
-      where: { id: 'config' },
-      update: { heroConfig: heroData, promoBannerConfig: bannerData },
-      create: { id: 'config', heroConfig: heroData, promoBannerConfig: bannerData }
-    });
-    revalidatePath('/'); 
+    const existing = await prisma.siteSettings.findFirst();
+    
+    // Construct data object
+    const dataToSave = { 
+        heroConfig: hero, 
+        promoBannerConfig: banner,
+        // ⚠️ Save the images map to the database
+        categoryGridConfig: categoryImages 
+    };
+
+    if (existing) {
+      await prisma.siteSettings.update({
+        where: { id: existing.id },
+        data: dataToSave
+      });
+    } else {
+      await prisma.siteSettings.create({
+        data: dataToSave
+      });
+    }
+
+    revalidatePath('/', 'layout');
     return { success: true };
-  } catch (e: any) {
-    console.error("Home Update Error:", e); // ⚠️ LOGGING ADDED
-    return { error: e.message || "Failed to save homepage settings" };
+  } catch (e) {
+    console.error("Save Error:", e);
+    return { error: "Failed to save settings. Check server logs." };
   }
 }
 
@@ -75,15 +94,22 @@ export async function updateFooterSettings(footerData: any) {
   if (session?.user?.role !== 'SUPER_ADMIN') return { error: "Unauthorized" };
 
   try {
-    await prisma.siteSettings.upsert({
-      where: { id: 'config' },
-      update: { footerConfig: footerData },
-      create: { id: 'config', footerConfig: footerData }
-    });
-    revalidatePath('/'); 
+    // Helper logic to find the singleton row
+    const existing = await prisma.siteSettings.findFirst();
+    if (existing) {
+        await prisma.siteSettings.update({
+            where: { id: existing.id },
+            data: { footerConfig: footerData }
+        });
+    } else {
+        await prisma.siteSettings.create({
+            data: { footerConfig: footerData }
+        });
+    }
+    revalidatePath('/', 'layout'); 
     return { success: true };
   } catch (e: any) {
-    console.error("Footer Update Error:", e); // ⚠️ LOGGING ADDED
+    console.error("Footer Update Error:", e);
     return { error: e.message || "Failed to save footer settings" };
   }
 }
@@ -94,15 +120,21 @@ export async function updateHeaderSettings(headerData: any) {
   if (session?.user?.role !== 'SUPER_ADMIN') return { error: "Unauthorized" };
 
   try {
-    await prisma.siteSettings.upsert({
-      where: { id: 'config' },
-      update: { headerConfig: headerData },
-      create: { id: 'config', headerConfig: headerData }
-    });
+    const existing = await prisma.siteSettings.findFirst();
+    if (existing) {
+        await prisma.siteSettings.update({
+            where: { id: existing.id },
+            data: { headerConfig: headerData }
+        });
+    } else {
+        await prisma.siteSettings.create({
+            data: { headerConfig: headerData }
+        });
+    }
     revalidatePath('/', 'layout'); 
     return { success: true };
   } catch (e: any) {
-    console.error("Header Update Error:", e); // ⚠️ LOGGING ADDED
+    console.error("Header Update Error:", e);
     return { error: e.message || "Failed to save header settings" };
   }
 }

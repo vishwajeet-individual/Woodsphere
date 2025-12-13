@@ -1,28 +1,31 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { Box, Button, TextField, Card, Typography, Stack, IconButton, Grid } from '@mui/material';
-import { Add, Delete, Save } from '@mui/icons-material';
+import { 
+  Box, Button, TextField, Card, Typography, Stack, Grid, Divider, 
+  Accordion, AccordionSummary, AccordionDetails, IconButton, Autocomplete, 
+  Tooltip
+} from '@mui/material';
+import { 
+  Save, Add, Delete, ExpandMore, Link as LinkIcon, AutoAwesome, 
+  Pages 
+} from '@mui/icons-material';
 import { getFooterSettings, updateFooterSettings } from '@/lib/actions/settings';
+import { getAllContentPages } from '@/lib/actions/pages';
 import { toast } from 'sonner';
 
 export default function FooterEditor() {
   const [loading, setLoading] = useState(false);
   const [data, setData] = useState<any>({ 
-    social: { facebook: '', instagram: '', twitter: '', youtube: '' }, 
-    columns: [] 
+    social: {}, columns: [] 
   });
-  const [isLoaded, setIsLoaded] = useState(false);
+  
+  // DB Pages for Smart Autocomplete
+  const [dbPages, setDbPages] = useState<any[]>([]);
 
   useEffect(() => {
-    // ⚠️ FIX: Cast response to 'any' to handle Prisma Json type
-    getFooterSettings().then((fetchedData: any) => {
-        setData({
-            social: fetchedData?.social || {},
-            columns: fetchedData?.columns || []
-        });
-        setIsLoaded(true);
-    });
+    getFooterSettings().then((res: any) => setData({ social: res?.social || {}, columns: res?.columns || [] }));
+    getAllContentPages().then((pages) => setDbPages(pages));
   }, []);
 
   const handleSave = async () => {
@@ -30,125 +33,154 @@ export default function FooterEditor() {
     const res = await updateFooterSettings(data);
     setLoading(false);
     if (res.error) toast.error(res.error);
-    else toast.success("Footer settings saved!");
+    else toast.success("Saved!");
   };
 
-  // --- Helpers ---
-  const updateSocial = (key: string, val: string) => {
-    setData({ ...data, social: { ...data.social, [key]: val } });
+  // --- Handlers ---
+  const updateSocial = (k: string, v: string) => setData({ ...data, social: { ...data.social, [k]: v } });
+
+  // Column Ops
+  const addColumn = () => setData({ ...data, columns: [...data.columns, { title: 'New Column', links: [] }] });
+  const removeColumn = (i: number) => {
+      const nc = [...data.columns]; nc.splice(i, 1); setData({ ...data, columns: nc });
+  };
+  const updateColTitle = (i: number, v: string) => {
+      const nc = [...data.columns]; nc[i].title = v; setData({ ...data, columns: nc });
   };
 
-  const addColumn = () => {
-    setData({ ...data, columns: [...data.columns, { title: 'New Column', links: [] }] });
+  // Link Ops
+  const addLink = (ci: number) => {
+      const nc = [...data.columns]; nc[ci].links.push({ label: '', url: '' }); setData({ ...data, columns: nc });
+  };
+  const removeLink = (ci: number, li: number) => {
+      const nc = [...data.columns]; nc[ci].links.splice(li, 1); setData({ ...data, columns: nc });
+  };
+  const updateLink = (ci: number, li: number, field: string, val: string) => {
+      const nc = [...data.columns]; nc[ci].links[li][field] = val; setData({ ...data, columns: nc });
   };
 
-  const removeColumn = (idx: number) => {
-    const newCols = [...data.columns];
-    newCols.splice(idx, 1);
-    setData({ ...data, columns: newCols });
+  // 🧠 SMART LINK SELECTOR
+  const handleSmartSelect = (ci: number, li: number, page: any) => {
+      const nc = [...data.columns];
+      if (page) {
+          // Auto-fill Title and URL
+          nc[ci].links[li].label = nc[ci].links[li].label || page.title;
+          nc[ci].links[li].url = `/pages/${page.slug}`;
+      }
+      setData({ ...data, columns: nc });
   };
-
-  const updateColumnTitle = (idx: number, val: string) => {
-    const newCols = [...data.columns];
-    newCols[idx].title = val;
-    setData({ ...data, columns: newCols });
-  };
-
-  const addLink = (colIdx: number) => {
-    const newCols = [...data.columns];
-    newCols[colIdx].links.push({ label: 'New Link', url: '/' });
-    setData({ ...data, columns: newCols });
-  };
-
-  const removeLink = (colIdx: number, linkIdx: number) => {
-    const newCols = [...data.columns];
-    newCols[colIdx].links.splice(linkIdx, 1);
-    setData({ ...data, columns: newCols });
-  };
-
-  const updateLink = (colIdx: number, linkIdx: number, field: 'label' | 'url', val: string) => {
-    const newCols = [...data.columns];
-    newCols[colIdx].links[linkIdx][field] = val;
-    setData({ ...data, columns: newCols });
-  };
-
-  if (!isLoaded) return <Typography sx={{ p: 4 }}>Loading Footer Settings...</Typography>;
 
   return (
     <Stack spacing={4}>
       
-      {/* 1. Social Media Links */}
-      <Card sx={{ p: 4, borderRadius: 4, boxShadow: '0 4px 20px rgba(0,0,0,0.05)' }}>
-        <Typography variant="h6" fontWeight={700} gutterBottom>Social Media Links</Typography>
+      {/* 1. SOCIALS */}
+      <Card sx={{ p: 3, borderRadius: 3 }}>
+        <Typography variant="h6" fontWeight={700} mb={2}>Social Media</Typography>
         <Grid container spacing={2}>
-            {['facebook', 'instagram', 'twitter', 'youtube'].map((platform) => (
-                <Grid item xs={12} md={6} key={platform}>
+            {['facebook', 'instagram', 'twitter', 'youtube'].map((p) => (
+                <Grid item xs={12} md={6} key={p}>
                     <TextField 
-                        label={platform.charAt(0).toUpperCase() + platform.slice(1)} 
-                        fullWidth 
-                        size="small"
-                        value={data.social?.[platform] || ''}
-                        onChange={(e) => updateSocial(platform, e.target.value)}
-                        placeholder="https://..."
+                        label={p.charAt(0).toUpperCase() + p.slice(1)} fullWidth size="small"
+                        value={data.social?.[p] || ''} onChange={(e) => updateSocial(p, e.target.value)}
                     />
                 </Grid>
             ))}
         </Grid>
       </Card>
 
-      {/* 2. Footer Columns */}
-      {data.columns.map((col: any, colIdx: number) => (
-        <Card key={colIdx} sx={{ p: 4, borderRadius: 4, boxShadow: '0 4px 20px rgba(0,0,0,0.05)' }}>
-            <Stack direction="row" justifyContent="space-between" alignItems="center" mb={2}>
-                <TextField 
-                    label={`Column ${colIdx + 1} Title`}
-                    value={col.title}
-                    onChange={(e) => updateColumnTitle(colIdx, e.target.value)}
-                    size="small"
-                    sx={{ fontWeight: 700 }}
-                />
-                <IconButton color="error" onClick={() => removeColumn(colIdx)}>
-                    <Delete />
-                </IconButton>
-            </Stack>
-
-            <Stack spacing={2} ml={2}>
-                {col.links.map((link: any, linkIdx: number) => (
-                    <Stack direction="row" spacing={2} key={linkIdx} alignItems="center">
-                        <TextField 
-                            label="Label" size="small" value={link.label} 
-                            onChange={(e) => updateLink(colIdx, linkIdx, 'label', e.target.value)}
-                        />
-                        <TextField 
-                            label="URL" size="small" fullWidth value={link.url} 
-                            onChange={(e) => updateLink(colIdx, linkIdx, 'url', e.target.value)}
-                        />
-                        <IconButton size="small" color="error" onClick={() => removeLink(colIdx, linkIdx)}>
-                            <Delete fontSize="small" />
-                        </IconButton>
+      {/* 2. AUTO-GENERATED PREVIEW */}
+      <Accordion sx={{ borderRadius: 3, boxShadow: 'none', border: '1px solid #eee', '&:before':{display:'none'} }}>
+        <AccordionSummary expandIcon={<ExpandMore />}>
+           <Stack direction="row" spacing={1} alignItems="center">
+              <AutoAwesome color="warning" fontSize="small" />
+              <Typography fontWeight={700}>System Auto-Generated Columns</Typography>
+           </Stack>
+        </AccordionSummary>
+        <AccordionDetails>
+           <Typography variant="body2" color="text.secondary" mb={2}>
+              These columns are managed automatically via the <b>Page Content</b> tab placements.
+           </Typography>
+           <Grid container spacing={2}>
+              {['FOOTER_HELP', 'FOOTER_COMPANY', 'FOOTER_LEGAL'].map(cat => (
+                 <Grid item xs={4} key={cat}>
+                    <Typography variant="caption" fontWeight={700}>{cat.replace('FOOTER_', '')}</Typography>
+                    <Stack mt={1} spacing={0.5}>
+                       {dbPages.filter(p => p.category === cat || p.category === cat.replace('FOOTER_', '')).map(p => (
+                          <Typography key={p.id} variant="body2">• {p.title}</Typography>
+                       ))}
                     </Stack>
-                ))}
-                <Button startIcon={<Add />} onClick={() => addLink(colIdx)} sx={{ width: 'fit-content' }}>
-                    Add Link
-                </Button>
-            </Stack>
-        </Card>
-      ))}
+                 </Grid>
+              ))}
+           </Grid>
+        </AccordionDetails>
+      </Accordion>
 
-      <Button variant="outlined" startIcon={<Add />} onClick={addColumn} sx={{ py: 2, borderStyle: 'dashed' }}>
-          Add New Column
-      </Button>
+      <Divider />
 
-      <Box sx={{ position: 'sticky', bottom: 20, zIndex: 10 }}>
-        <Button 
-            variant="contained" 
-            size="large" 
-            startIcon={<Save />} 
-            onClick={handleSave} 
-            disabled={loading}
-            sx={{ borderRadius: 50, float: 'right', px: 4 }}
-        >
-           {loading ? "Saving..." : "Publish Footer & Socials"}
+      {/* 3. MANUAL COLUMNS */}
+      <Box>
+         <Stack direction="row" justifyContent="space-between" mb={2}>
+             <Typography variant="h6" fontWeight={700}>Custom Columns</Typography>
+             <Button variant="outlined" startIcon={<Add />} onClick={addColumn}>Add Column</Button>
+         </Stack>
+
+         <Stack spacing={3}>
+            {data.columns.map((col: any, ci: number) => (
+                <Card key={ci} sx={{ p: 3, borderRadius: 3, border: '1px solid #eee', boxShadow: 'none' }}>
+                    <Stack direction="row" justifyContent="space-between" mb={2}>
+                        <TextField 
+                            label="Column Title" size="small" sx={{ fontWeight: 700 }}
+                            value={col.title} onChange={(e) => updateColTitle(ci, e.target.value)}
+                        />
+                        <IconButton color="error" onClick={() => removeColumn(ci)}><Delete /></IconButton>
+                    </Stack>
+
+                    <Stack spacing={2}>
+                        {col.links.map((link: any, li: number) => (
+                            <Grid container spacing={2} key={li} alignItems="center">
+                                <Grid item xs={4}>
+                                    <TextField 
+                                        label="Label" size="small" fullWidth
+                                        value={link.label} onChange={(e) => updateLink(ci, li, 'label', e.target.value)}
+                                    />
+                                </Grid>
+                                {/* SMART AUTOCOMPLETE URL */}
+                                <Grid item xs={7}>
+                                    <Autocomplete
+                                        freeSolo
+                                        options={dbPages}
+                                        getOptionLabel={(o) => typeof o === 'string' ? o : o.title}
+                                        inputValue={link.url}
+                                        onInputChange={(_, v) => updateLink(ci, li, 'url', v)}
+                                        onChange={(_, v) => handleSmartSelect(ci, li, v)}
+                                        renderInput={(params) => (
+                                            <TextField 
+                                                {...params} label="URL / Select Page" size="small" 
+                                                InputProps={{ ...params.InputProps, startAdornment: <Pages color="action" sx={{ mr: 1, opacity: 0.5 }} fontSize="small" /> }}
+                                            />
+                                        )}
+                                        renderOption={(props, option) => (
+                                            <li {...props} key={option.id}>
+                                                <Stack><Typography variant="body2">{option.title}</Typography><Typography variant="caption" color="text.secondary">/pages/{option.slug}</Typography></Stack>
+                                            </li>
+                                        )}
+                                    />
+                                </Grid>
+                                <Grid item xs={1}>
+                                    <IconButton size="small" onClick={() => removeLink(ci, li)}><Delete fontSize="small" /></IconButton>
+                                </Grid>
+                            </Grid>
+                        ))}
+                        <Button startIcon={<Add />} onClick={() => addLink(ci)} size="small" sx={{ width: 'fit-content' }}>Add Link</Button>
+                    </Stack>
+                </Card>
+            ))}
+         </Stack>
+      </Box>
+
+      <Box sx={{ position: 'sticky', bottom: 20, zIndex: 10, display: 'flex', justifyContent: 'flex-end' }}>
+        <Button variant="contained" size="large" startIcon={<Save />} onClick={handleSave} disabled={loading} sx={{ borderRadius: 50, px: 4 }}>
+           {loading ? "Saving..." : "Save Settings"}
         </Button>
       </Box>
 

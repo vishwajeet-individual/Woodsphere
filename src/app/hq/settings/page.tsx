@@ -5,6 +5,7 @@ import { Box, Typography, Card, Stack, TextField, Button, Switch, FormControlLab
 import HomeEditor from '@/components/hq/HomeEditor';
 import FooterEditor from '@/components/hq/FooterEditor'; // ⚠️ Imported Component
 import HeaderEditor from '@/components/hq/HeaderEditor';
+import PageManager from '@/components/hq/PageManager';
 
 // General Settings Component (Inline)
 function GeneralSettings() {
@@ -48,6 +49,7 @@ export default function HQSettingsPage() {
           <Tab label="Header" />
           <Tab label="Homepage" />
           <Tab label="Footer & Socials" />
+          <Tab label="Page Content" />
         </Tabs>
       </Box>
 
@@ -63,6 +65,9 @@ export default function HQSettingsPage() {
       </Box>
       <Box hidden={tab !== 3}>
          <FooterEditor />
+      </Box>
+      <Box hidden={tab !== 4}>
+         <PageManager />
       </Box>
     </Box>
   );

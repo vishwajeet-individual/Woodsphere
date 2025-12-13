@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useRef, useEffect } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import {
   AppBar,
   Toolbar,
@@ -131,16 +131,12 @@ const FOOTER_LINKS = [
   { label: 'Terms & Conditions', href: '/terms' },
 ];
 
-type HeaderProps = {
-  // This is expected to be siteSettings.headerConfig
-  settings?: {
-    logoText?: string;
-    logoImage?: string;
-    navigation?: any[];
-  };
-};
+interface HeaderProps {
+  settings?: any;
+  dynamicPages?: any[]; // New Prop
+}
 
-export default function Header({ settings }: HeaderProps) {
+export default function Header({ settings, dynamicPages = [] }: HeaderProps) {
   const { data: session } = useSession();
   const router = useRouter();
   const { cartCount } = useCart();
@@ -156,14 +152,58 @@ export default function Header({ settings }: HeaderProps) {
 
   const isScrolled = useScrollTrigger({ disableHysteresis: true, threshold: 10 });
 
-  // 1. Use navigation from DB if present, otherwise fallback
-  const navTree = settings?.navigation || NAV_TREE;
+  // 1. Base navigation (from settings or fallback)
+  const baseNav = settings?.navigation || NAV_TREE;
 
-  // 2. Icon mapper helper (string -> MUI icon component)
-  const getIcon = (iconName: string) => {
-    // @ts-ignore - dynamic access over MuiIcons namespace
-    const IconComponent = MuiIcons[iconName];
-    return IconComponent ? <IconComponent /> : <MuiIcons.Weekend />;
+  // 1A. Process Navigation to inject Dynamic Pages as subs for matching header items
+  const processedNav = baseNav.map((item: any) => {
+    // Find pages assigned to this specific menu item (e.g., "HEADER_SUB:living-room")
+    const dynamicSubs = dynamicPages
+      .filter((p) => p.category === `HEADER_SUB:${item.slug}`)
+      .map((p) => ({
+        label: p.title,
+        slug: p.slug,
+        href: `/pages/${p.slug}`,
+      }));
+
+    // Merge existing subs with dynamic ones (preserve original order: existing then dynamic)
+    const existingSubs = item.subs || [];
+    return {
+      ...item,
+      subs: [...existingSubs, ...dynamicSubs],
+    };
+  });
+
+  // 1B. Find Top-Level Dynamic Header Pages (Category = "HEADER")
+  const rootHeaderPages = dynamicPages
+    .filter((p) => p.category === 'HEADER')
+    .map((p) => ({
+      label: p.title,
+      slug: p.slug,
+      icon: <MuiIcons.Article />, // React element is supported by getIcon
+      href: `/pages/${p.slug}`,
+      subs: [],
+    }));
+
+  // 1C. Final nav tree used by the component
+  const navTree = [...processedNav, ...rootHeaderPages];
+
+
+  // 2. Icon mapper helper (string -> MUI icon component or accept React element)
+  const getIcon = (iconName: any) => {
+    if (!iconName) return <MuiIcons.Weekend />;
+    // If a React element is passed in nav config, return it directly
+    if (React.isValidElement(iconName)) return iconName;
+    // If an object with a `type` exists (rare), try to render as element
+    if (typeof iconName === 'object' && iconName?.type) return iconName;
+
+    // Otherwise expect a string name that maps to MuiIcons
+    if (typeof iconName === 'string') {
+      // @ts-ignore dynamic access over MuiIcons namespace
+      const IconComponent = (MuiIcons as any)[iconName];
+      return IconComponent ? <IconComponent /> : <MuiIcons.Weekend />;
+    }
+    return <MuiIcons.Weekend />;
   };
 
   useEffect(() => {
@@ -596,7 +636,7 @@ export default function Header({ settings }: HeaderProps) {
               <ListItem disablePadding sx={{ mb: 0.5 }}>
                 <ListItemButton
                   component={Link}
-                  href={getCategoryLink(item.slug)}
+                  href={item.href ?? getCategoryLink(item.slug)}
                   onClick={
                     item.isSale
                       ? () => setMobileOpen(false)

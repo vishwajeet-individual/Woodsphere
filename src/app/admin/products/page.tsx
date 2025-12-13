@@ -1,10 +1,11 @@
 import { auth } from '@/auth';
 import { prisma } from '@/lib/prisma';
 import ProductList from '@/components/admin/ProductList';
-import { Box, Typography, Button, Stack } from '@mui/material';
+import { Box, Typography, Stack } from '@mui/material'; // ❌ Removed Button
 import { Add } from '@mui/icons-material';
-import Link from 'next/link';
+// ❌ Removed Link import
 import { redirect } from 'next/navigation';
+import LinkButton from '@/components/ui/LinkButton'; // 👈 1. IMPORT THIS
 
 export const dynamic = 'force-dynamic';
 
@@ -19,7 +20,7 @@ async function getVendorProducts(userId: string) {
 
   // 2. Fetch Products for THIS store only
   return await prisma.product.findMany({
-    where: { storeId: store.id }, // <--- FILTER BY STORE
+    where: { storeId: store.id },
     include: { subCategory: true },
     orderBy: { createdAt: 'desc' }
   });
@@ -43,15 +44,16 @@ export default async function VendorProductsPage() {
         <Typography variant="h4" fontWeight={700}>
           My Inventory
         </Typography>
-        <Button 
-          component={Link} 
+        
+        {/* ⚠️ FIX: Use LinkButton instead of Button + Link */}
+        <LinkButton 
           href="/admin/products/new" 
           variant="contained" 
           startIcon={<Add />}
           sx={{ borderRadius: 8 }}
         >
           Add Product
-        </Button>
+        </LinkButton>
       </Stack>
 
       <ProductList products={products} />

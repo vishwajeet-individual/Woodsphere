@@ -1,9 +1,10 @@
 import { prisma } from '@/lib/prisma';
 import ProductForm from '@/components/admin/ProductForm';
-import { Box, Typography, Button } from '@mui/material';
+import { Box, Typography } from '@mui/material'; // ❌ Remove Button
 import { ArrowBack } from '@mui/icons-material';
-import Link from 'next/link';
+// ❌ Remove Link import
 import { notFound } from 'next/navigation';
+import LinkButton from '@/components/ui/LinkButton'; // 👈 1. IMPORT THIS
 
 export const dynamic = 'force-dynamic';
 
@@ -15,7 +16,7 @@ async function getData(productId: string) {
 
   const product = await prisma.product.findUnique({
     where: { id: productId },
-    include: { subCategory: true } // Needed to find parent category ID
+    include: { subCategory: true } 
   });
 
   return { categories, product };
@@ -35,9 +36,14 @@ export default async function EditProductPage({ params }: { params: Promise<{ id
 
   return (
     <Box>
-      <Button startIcon={<ArrowBack />} component={Link} href="/admin/products" sx={{ mb: 2 }}>
+      {/* ⚠️ FIX: Use LinkButton instead of Button + component={Link} */}
+      <LinkButton 
+        startIcon={<ArrowBack />} 
+        href="/admin/products" 
+        sx={{ mb: 2 }}
+      >
         Back to Products
-      </Button>
+      </LinkButton>
       
       <ProductForm categories={categories} initialData={formattedProduct} />
     </Box>

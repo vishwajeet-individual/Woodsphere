@@ -121,7 +121,6 @@ export default function LoginPage() {
       const idToken = await res.user.getIdToken();
 
       // 2. Login with NextAuth Server Action
-      // We expect this to redirect. If it returns, it might be an error or void.
       const actionRes = await loginWithPhoneAction(idToken);
       
       // 3. Handle Fallback (If server didn't redirect automatically)
@@ -132,6 +131,8 @@ export default function LoginPage() {
       } else {
         // Force client-side redirect if server action finished without error
         toast.success("Login Successful!");
+        // Use router.push('/') if inside a transition/action, but window.location.href 
+        // is often required to break out of nested authentication logic flow.
         window.location.href = '/'; 
       }
 
@@ -178,7 +179,7 @@ export default function LoginPage() {
 
         <div id="recaptcha-container"></div>
 
-        {/* Case 1: Email -> Show Password */}
+        {/* Case 1: Email -> Show Password and Forgot Link */}
         <Collapse in={inputType === 'email'}>
             <TextField
                 label="Password"
@@ -186,8 +187,14 @@ export default function LoginPage() {
                 fullWidth
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
-                sx={{ mb: 2 }}
+                sx={{ mb: 1 }} // Reduced margin to make space for the link
             />
+            {/* ⚠️ ADDED: Forgot password link */}
+            <Box display="flex" justifyContent="flex-end" mb={2}>
+                <Button component={Link} href="/forgot-password" size="small" sx={{ textTransform: 'none', fontSize: '0.8rem' }}>
+                    Forgot password?
+                </Button>
+            </Box>
         </Collapse>
 
         {/* Case 2: Phone -> Show OTP Input after sending */}

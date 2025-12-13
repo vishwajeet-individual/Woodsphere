@@ -1,5 +1,6 @@
 import NextAuth from 'next-auth';
 import { authConfig } from './auth.config';
+import { PrismaAdapter } from "@auth/prisma-adapter"; // 👈 Import the adapter
 import Credentials from 'next-auth/providers/credentials';
 import Google from 'next-auth/providers/google';
 import { z } from 'zod';
@@ -15,7 +16,12 @@ const LoginSchema = z.object({
 
 export const { auth, signIn, signOut, handlers } = NextAuth({
   ...authConfig,
-  // ❌ REMOVED: allowDangerousEmailAccountLinking: true, (Not allowed here in v5)
+  
+  // ⚠️ FIX 1: CONNECT THE DATABASE ADAPTER
+  adapter: PrismaAdapter(prisma),
+
+  // ⚠️ FIX 2: FORCE JWT STRATEGY (Required when using Adapter + Credentials together)
+  session: { strategy: "jwt" },
   
   providers: [
     // 1. GOOGLE PROVIDER
@@ -69,7 +75,8 @@ export const { auth, signIn, signOut, handlers } = NextAuth({
               console.log('👋 Found existing user id=', user.id);
             }
 
-            return user;
+            // The user object must be returned for the session to be established
+            return user; 
           } catch (err: any) {
             console.error('❌ Firebase verification failed:', err.message || err);
             return null;
