@@ -1,10 +1,10 @@
 # Woodsphere 🪵
 
-<!-- ![Woodsphere Banner](https://images.unsplash.com/photo-1616486338812-3dadae4b4f9d?q=80&w=2070&auto=format&fit=crop) -->
+![Woodsphere Banner](https://images.unsplash.com/photo-1616486338812-3dadae4b4f9d?q=80&w=2070&auto=format&fit=crop)
 
 > **A Premium Full-Stack E-Commerce Platform with Dynamic Content Management.**
 
-[![Live Demo](https://woodsphere.vercel.app/)](https://woodsphere.vercel.app)
+[![Live Demo](https://img.shields.io/badge/Live_Demo-Visit_Site-success?style=for-the-badge&logo=vercel)](https://woodsphere.vercel.app)
 [![Next.js](https://img.shields.io/badge/Next.js-15.0-black?style=flat-square&logo=next.js)](https://nextjs.org/)
 [![TypeScript](https://img.shields.io/badge/TypeScript-5.0-blue?style=flat-square&logo=typescript)](https://www.typescriptlang.org/)
 [![Prisma](https://img.shields.io/badge/Prisma-ORM-2d3748?style=flat-square&logo=prisma)](https://www.prisma.io/)
